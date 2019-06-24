@@ -1,0 +1,23 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: test-alpine
+  name: test-alpine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-alpine
+  template:
+    metadata:
+      labels:
+        app: test-alpine
+      annotations:
+        cluster-name.envoy.uw.io: test-cluster
+    spec:
+      containers:
+      - image: alpine
+        imagePullPolicy: Always
+        name: alpine
+        command: ["/bin/sh", "-c", "while true; do sleep 3600; done"]

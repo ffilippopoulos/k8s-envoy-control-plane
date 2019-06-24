@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"context"
 	"flag"
 	"fmt"
 	"log"
@@ -9,19 +8,17 @@ import (
 	"sync"
 	"time"
 
-	//"k8s.io/client-go/rest"
-	//"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/kubernetes"
 
-	ingresslistener_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
-	//ingresslistener_v1alpha1 "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/informers/externalversions/ingresslistener/v1alpha1"
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/cluster"
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/listener"
+	custom_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
 )
 
 var (
 	// flags
-	flagConfigPath = flag.String("config", "", "(Required) Path of the config file that keeps static sources configuration")
+	flagSourcesConfigPath = flag.String("sources", "", "(Required) Path of the config file that keeps static sources configuration")
+	flagClusterNameAnno   = flag.String("cluster-name-annotation", "cluster-name.envoy.uw.io", "(Required) Annotation that will mark a pod as part of a cluster")
 )
 
 func usage() {
@@ -33,17 +30,18 @@ func main() {
 
 	flag.Parse()
 
-	if *flagConfigPath == "" {
+	if *flagSourcesConfigPath == "" {
 		usage()
 	}
 
-	k8sSources, err := LoadSourcesConfig(*flagConfigPath)
+	k8sSources, err := LoadSourcesConfig(*flagSourcesConfigPath)
 	if err != nil {
-		log.Fatal("Reading config failed: ", err)
+		log.Fatal("Reading sources config failed: ", err)
 	}
 
 	sources := []kubernetes.Interface{}
-	var il_client ingresslistener_clientset.Interface
+	var il_client custom_clientset.Interface
+
 	for _, s := range k8sSources {
 
 		client, err := cluster.GetClient(s.KubeConfig)
@@ -58,8 +56,8 @@ func main() {
 		}
 	}
 
-	sa := cluster.NewPodAggregator(sources)
-	sa.Start()
+	ca := cluster.NewClusterAggregator(sources, *flagClusterNameAnno)
+	ca.Start()
 
 	ilw := listener.NewIngressListenerWatcher(il_client, time.Minute)
 	ilw.Start()
