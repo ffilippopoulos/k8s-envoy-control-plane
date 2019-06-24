@@ -1,0 +1,11 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: egresslisteners.custom-envoy.uw.systems
+spec:
+  group: custom-envoy.uw.systems
+  version: v1alpha1
+  names:
+    kind: EgressListener
+    plural: egresslisteners
+scope: Namespaced

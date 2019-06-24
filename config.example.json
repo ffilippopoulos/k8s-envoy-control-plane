@@ -1,0 +1,12 @@
+[
+  {
+    "name": "aws",
+    "kubeconfig": "/home/foivos/tempconfig/aws-kubeconf",
+    "role": "primary"
+  },
+  {
+    "name": "gcp",
+    "kubeconfig": "/home/foivos/tempconfig/gcp-kubeconf",
+    "role": "secondary"
+  }
+]
