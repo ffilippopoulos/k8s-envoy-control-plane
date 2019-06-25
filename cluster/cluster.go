@@ -1,5 +1,13 @@
 package cluster
 
+import (
+	"time"
+
+	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
+	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
+	"github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
+)
+
 type EndpointsSet map[string]Endpoint
 
 type Endpoint struct {
@@ -9,6 +17,51 @@ type Endpoint struct {
 
 type Cluster struct {
 	endpoints EndpointsSet
+}
+
+// Generate an envoy cluster
+func (cs *Cluster) Generate(name string) *v2.Cluster {
+	var endpoints []endpoint.LbEndpoint
+
+	for _, e := range cs.endpoints {
+
+		localAddress := &core.Address{
+			Address: &core.Address_SocketAddress{
+				SocketAddress: &core.SocketAddress{
+					Address: e.podIp,
+					PortSpecifier: &core.SocketAddress_PortValue{
+						PortValue: 8080,
+					},
+				},
+			},
+		}
+
+		endpoints = append(endpoints, endpoint.LbEndpoint{
+			HostIdentifier: &endpoint.LbEndpoint_Endpoint{
+				Endpoint: &endpoint.Endpoint{
+					Address: localAddress,
+				},
+			},
+		})
+	}
+
+	lEndpoints := []endpoint.LocalityLbEndpoints{{
+		LbEndpoints: endpoints,
+	}}
+
+	cluster := &v2.Cluster{
+		Name:           name,
+		ConnectTimeout: 5 * time.Second,
+		LoadAssignment: &v2.ClusterLoadAssignment{
+			ClusterName: name,
+			Endpoints:   lEndpoints,
+		},
+		//TlsContext:   tls,
+		HealthChecks: []*core.HealthCheck{},
+	}
+
+	return cluster
+
 }
 
 type ClusterStore struct {
