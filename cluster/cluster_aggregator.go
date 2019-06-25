@@ -3,6 +3,7 @@ package cluster
 import (
 	"log"
 
+	"github.com/envoyproxy/go-control-plane/pkg/cache"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -41,6 +42,7 @@ func (ca *ClusterAggregator) handler(eventType watch.EventType, old *v1.Pod, new
 			if new.Status.PodIP != "" {
 				log.Printf("[DEBUG] received %s event for cluster %s ip: %s", eventType, clusterName, new.Status.PodIP)
 				ca.clusterStore.CreateOrUpdate(clusterName, new.Name, new.Status.PodIP)
+				ca.events <- new
 			}
 		}
 	case watch.Modified:
@@ -48,14 +50,28 @@ func (ca *ClusterAggregator) handler(eventType watch.EventType, old *v1.Pod, new
 			if new.Status.PodIP != "" {
 				log.Printf("[DEBUG] received %s event for cluster %s ip: %s", eventType, clusterName, new.Status.PodIP)
 				ca.clusterStore.CreateOrUpdate(clusterName, new.Name, new.Status.PodIP)
+				ca.events <- new
 			}
 		}
 	case watch.Deleted:
 		if clusterName, ok := old.Annotations[ca.clusterAnnotation]; ok {
 			log.Printf("[DEBUG] received %s event for cluster %s ip: %s", eventType, clusterName, old.Status.PodIP)
 			ca.clusterStore.Delete(clusterName, old.Name)
+			ca.events <- old
 		}
 	default:
 		log.Printf("[DEBUG] received %s event: cannot handle", eventType)
 	}
+}
+
+func (ca *ClusterAggregator) Events() chan interface{} {
+	return ca.events
+}
+
+func (ca *ClusterAggregator) GenerateClusters() []cache.Resource {
+	var cr []cache.Resource
+	for n, c := range ca.clusterStore.store {
+		cr = append(cr, c.Generate(n))
+	}
+	return cr
 }
