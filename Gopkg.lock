@@ -10,7 +10,7 @@
   version = "v1.1.1"
 
 [[projects]]
-  digest = "1:4aedd18bb54a4f04281757ad92ecf4fcff92646e8529832903ed1e5a64e6aab6"
+  digest = "1:361f407698d1f0c0ac581d278bb92ce44599ba73508efac8bd40860670b8f7c9"
   name = "github.com/envoyproxy/go-control-plane"
   packages = [
     "envoy/api/v2",
@@ -21,15 +21,20 @@
     "envoy/api/v2/listener",
     "envoy/api/v2/route",
     "envoy/config/filter/accesslog/v2",
+    "envoy/config/filter/network/http_connection_manager/v2",
     "envoy/config/filter/network/tcp_proxy/v2",
-    "envoy/config/rbac/v2alpha",
+    "envoy/config/rbac/v2",
+    "envoy/service/discovery/v2",
     "envoy/type",
     "envoy/type/matcher",
+    "pkg/cache",
+    "pkg/log",
+    "pkg/server",
     "pkg/util",
   ]
   pruneopts = ""
-  revision = "094d054b10176dd84506e4f0f65e7f65d8499241"
-  version = "v0.8.0"
+  revision = "c7e2a120463a2209c6a0871d778f4eab96457e6b"
+  version = "v0.8.1"
 
 [[projects]]
   digest = "1:6d8b4fb4c51db60a75537eeec6fb579b26e53832988d58224d4ebe6a2bb2bfe1"
@@ -543,10 +548,14 @@
     "github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint",
     "github.com/envoyproxy/go-control-plane/envoy/api/v2/listener",
     "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2",
-    "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v2alpha",
+    "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v2",
+    "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2",
+    "github.com/envoyproxy/go-control-plane/pkg/cache",
+    "github.com/envoyproxy/go-control-plane/pkg/server",
     "github.com/envoyproxy/go-control-plane/pkg/util",
     "github.com/gogo/protobuf/proto",
     "github.com/gogo/protobuf/types",
+    "google.golang.org/grpc",
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/apis/meta/v1",

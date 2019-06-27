@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -65,10 +66,14 @@ func (sw *podWatcher) Stop() {
 	close(sw.stopChannel)
 }
 
-func (sw *podWatcher) ListPodNames() []string {
-	var pods []string
-	for _, s := range sw.store.List() {
-		pods = append(pods, s.(*v1.Pod).Name)
+func (sw *podWatcher) List() ([]v1.Pod, error) {
+	var pods []v1.Pod
+	for _, obj := range sw.store.List() {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return nil, fmt.Errorf("unexpected object in store: %+v", obj)
+		}
+		pods = append(pods, *pod)
 	}
-	return pods
+	return pods, nil
 }

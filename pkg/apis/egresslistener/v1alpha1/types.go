@@ -32,6 +32,7 @@ type EgressListenerSpec struct {
 	// this is where you would put your custom resource data
 	NodeName      string `json:"nodename"`
 	ListenPort    *int32 `json:"listenport"`
+	TargetPort    *int32 `json:"targetport"`
 	TargetCluster string `json:"targetcluster"`
 }
 

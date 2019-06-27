@@ -1,9 +1,9 @@
 package cluster
 
 import (
+	"errors"
 	"log"
 
-	"github.com/envoyproxy/go-control-plane/pkg/cache"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -68,10 +68,20 @@ func (ca *ClusterAggregator) Events() chan interface{} {
 	return ca.events
 }
 
-func (ca *ClusterAggregator) GenerateClusters() []cache.Resource {
-	var cr []cache.Resource
-	for n, c := range ca.clusterStore.store {
-		cr = append(cr, c.Generate(n))
+func (ca *ClusterAggregator) List() []*Cluster {
+	var clusters []*Cluster
+	for _, cluster := range ca.clusterStore.store {
+		clusters = append(clusters, cluster)
 	}
-	return cr
+	return clusters
+}
+
+func (ca *ClusterAggregator) GetCluster(clusterName string) (*Cluster, error) {
+	for _, cluster := range ca.List() {
+		if clusterName == cluster.name {
+			return cluster, nil
+		}
+	}
+
+	return nil, errors.New("Can't find cluster: " + clusterName)
 }

@@ -92,6 +92,11 @@ func (in *EgressListenerSpec) DeepCopyInto(out *EgressListenerSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.TargetPort != nil {
+		in, out := &in.TargetPort, &out.TargetPort
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 
