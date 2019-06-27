@@ -11,34 +11,16 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
-	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
-	"github.com/ffilippopoulos/k8s-envoy-control-plane/cluster"
 	ingresslistener_v1alpha1 "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/apis/ingresslistener/v1alpha1"
 	ingresslistener_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
 )
 
 type IngressListener struct {
-	nodeName         string
-	listenPort       int32
-	targetPort       int32
-	rbacAllowCluster string
-}
-
-func (il *IngressListener) Generate(name string, clusters *cluster.ClusterAggregator) (*v2.Listener, *v2.Cluster) {
-	rbacCluster, err := clusters.GetCluster(il.rbacAllowCluster)
-	if err != nil {
-		return &v2.Listener{}, &v2.Cluster{}
-	}
-
-	sourceIPs := rbacCluster.GetIPs()
-
-	// Make a cluster first to point at the local service on the target port
-	c := cluster.MakeCluster("ingress_"+name+"_cluster", il.targetPort, []string{"127.0.0.1"})
-
-	// Then a listener, restricted to sourceIPs
-	l := MakeTCPListener("ingress_"+name, il.listenPort, "local_"+name, sourceIPs, "0.0.0.0")
-
-	return l, c
+	Name             string
+	NodeName         string
+	ListenPort       int32
+	TargetPort       int32
+	RbacAllowCluster string
 }
 
 type ingressListenerEventHandlerFunc func(eventType watch.EventType, old *ingresslistener_v1alpha1.IngressListener, new *ingresslistener_v1alpha1.IngressListener)
@@ -105,10 +87,11 @@ func (ils *IngressListenerStore) Init() {
 
 func (ils *IngressListenerStore) CreateOrUpdate(listenerName, nodeName, rbacAllowCluster string, listenPort, targetPort int32) {
 	ils.store[listenerName] = &IngressListener{
-		nodeName:         nodeName,
-		listenPort:       listenPort,
-		targetPort:       targetPort,
-		rbacAllowCluster: rbacAllowCluster,
+		Name:             listenerName,
+		NodeName:         nodeName,
+		ListenPort:       listenPort,
+		TargetPort:       targetPort,
+		RbacAllowCluster: rbacAllowCluster,
 	}
 }
 

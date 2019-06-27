@@ -5,43 +5,22 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ffilippopoulos/k8s-envoy-control-plane/cluster"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
-	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	egresslistener_v1alpha1 "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/apis/egresslistener/v1alpha1"
 	egresslistener_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
 )
 
 type EgressListener struct {
-	nodeName      string
-	listenPort    int32
-	targetPort    int32
-	targetCluster string
-}
-
-func (el *EgressListener) Generate(name string, clusters *cluster.ClusterAggregator) (*v2.Listener, *v2.Cluster) {
-	// Find targetCluster, extract IPs
-	targetCluster, err := clusters.GetCluster(el.targetCluster)
-	if err != nil {
-		log.Printf("[WARN] Can't find cluster: %s", el.targetCluster)
-		return &v2.Listener{}, &v2.Cluster{}
-	}
-
-	IPs := targetCluster.GetIPs()
-
-	// Make the cluster first
-	c := cluster.MakeCluster("egress_"+name+"_"+el.targetCluster, el.targetPort, IPs)
-
-	// Then a listener, only accessible from the pod
-	l := MakeTCPListener("egress_"+name, el.listenPort, el.targetCluster, []string{"127.0.0.1"}, "127.0.0.1")
-
-	// return listener, cluster
-	return l, c
+	Name          string
+	NodeName      string
+	ListenPort    int32
+	TargetPort    int32
+	TargetCluster string
 }
 
 type egressListenerEventHandlerFunc func(eventType watch.EventType, old *egresslistener_v1alpha1.EgressListener, new *egresslistener_v1alpha1.EgressListener)
@@ -108,10 +87,11 @@ func (ils *EgressListenerStore) Init() {
 
 func (ils *EgressListenerStore) CreateOrUpdate(listenerName, nodeName, targetCluster string, listenPort, targetPort int32) {
 	ils.store[listenerName] = &EgressListener{
-		nodeName:      nodeName,
-		listenPort:    listenPort,
-		targetPort:    targetPort,
-		targetCluster: targetCluster,
+		Name:          listenerName,
+		NodeName:      nodeName,
+		ListenPort:    listenPort,
+		TargetPort:    targetPort,
+		TargetCluster: targetCluster,
 	}
 }
 

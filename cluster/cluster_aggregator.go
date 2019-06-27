@@ -68,9 +68,17 @@ func (ca *ClusterAggregator) Events() chan interface{} {
 	return ca.events
 }
 
+func (ca *ClusterAggregator) List() []*Cluster {
+	var clusters []*Cluster
+	for _, cluster := range ca.clusterStore.store {
+		clusters = append(clusters, cluster)
+	}
+	return clusters
+}
+
 func (ca *ClusterAggregator) GetCluster(clusterName string) (*Cluster, error) {
-	for clusterName, cluster := range ca.clusterStore.store {
-		if clusterName == clusterName {
+	for _, cluster := range ca.List() {
+		if clusterName == cluster.name {
 			return cluster, nil
 		}
 	}

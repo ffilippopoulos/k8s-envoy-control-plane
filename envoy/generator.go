@@ -1,18 +1,19 @@
-package listener
+package envoy
 
 import (
 	"log"
-
-	"github.com/gogo/protobuf/proto"
-	"github.com/gogo/protobuf/types"
+	"time"
 
 	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
+	"github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
 	rbac_filter "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/rbac/v2"
 	tcp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
 	rbac "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v2"
 	"github.com/envoyproxy/go-control-plane/pkg/util"
+	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/types"
 )
 
 // MakeTCPListener creates a TCP listener for a cluster.
@@ -97,6 +98,43 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 		FilterChains: []listener.FilterChain{{
 			Filters: filters,
 		}},
+	}
+}
+
+// MakeCluster creates a cluster
+func MakeCluster(clusterName string, port int32, IPs []string) *v2.Cluster {
+	var endpoints []endpoint.LbEndpoint
+
+	for _, i := range IPs {
+		endpoint := endpoint.LbEndpoint{
+			HostIdentifier: &endpoint.LbEndpoint_Endpoint{
+				Endpoint: &endpoint.Endpoint{
+					Address: &core.Address{
+						Address: &core.Address_SocketAddress{
+							SocketAddress: &core.SocketAddress{
+								Address: i,
+								PortSpecifier: &core.SocketAddress_PortValue{
+									PortValue: uint32(port),
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		endpoints = append(endpoints, endpoint)
+	}
+
+	return &v2.Cluster{
+		Name:           clusterName,
+		ConnectTimeout: 5 * time.Second,
+		LoadAssignment: &v2.ClusterLoadAssignment{
+			ClusterName: clusterName,
+			Endpoints: []endpoint.LocalityLbEndpoints{{
+				LbEndpoints: endpoints,
+			}},
+		},
+		HealthChecks: []*core.HealthCheck{},
 	}
 }
 

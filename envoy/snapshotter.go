@@ -63,13 +63,54 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 		var clusters []cache.Resource
 		var listeners []cache.Resource
 
-		ingressListeners, ingressClusters := s.ingressListeners.GenerateListenersAndClusters(node, s.clusters)
-		clusters = append(clusters, ingressClusters...)
-		listeners = append(listeners, ingressListeners...)
+		// Create ingress listeners for the node
+		for _, ingressListener := range s.ingressListeners.List() {
+			if ingressListener.NodeName == node {
+				// Find the IPs of the cluster we want to allow by RBAC
+				rbacCluster, err := s.clusters.GetCluster(ingressListener.RbacAllowCluster)
+				if err != nil {
+					log.Printf("[ERROR] Can't find RBAC cluster %s, skipping ingress listener %s", ingressListener.RbacAllowCluster, ingressListener.Name)
+					continue
+				}
+				rbacClusterIPs := rbacCluster.GetIPs()
 
-		egressListeners, egressClusters := s.egressListeners.GenerateListenersAndClusters(node, s.clusters)
-		clusters = append(clusters, egressClusters...)
-		listeners = append(listeners, egressListeners...)
+				// Generate a local cluster
+				clusterName := "ingress_" + ingressListener.Name + "_cluster"
+				c := MakeCluster(clusterName, ingressListener.TargetPort, []string{"127.0.0.1"})
+
+				// Generate a listener to forward traffic to the cluster
+				l := MakeTCPListener("ingress_"+ingressListener.Name, ingressListener.ListenPort, clusterName, rbacClusterIPs, "0.0.0.0")
+
+				// Append to the list
+				clusters = append(clusters, c)
+				listeners = append(listeners, l)
+
+			}
+		}
+
+		// Create egress listeners for the node
+		for _, egressListener := range s.egressListeners.List() {
+			if egressListener.NodeName == node {
+				// Find the IPs of the pods in the target cluster
+				targetCluster, err := s.clusters.GetCluster(egressListener.TargetCluster)
+				if err != nil {
+					log.Printf("[ERROR] Can't find target cluster %s, skipping egress listener %s", egressListener.TargetCluster, egressListener.Name)
+					continue
+				}
+				targetClusterIPs := targetCluster.GetIPs()
+
+				// Generate a cluster to target the upstream cluster
+				clusterName := "egress_" + egressListener.Name + "_cluster"
+				c := MakeCluster(clusterName, egressListener.TargetPort, targetClusterIPs)
+
+				// Generate a listener to forward traffic to the cluster
+				l := MakeTCPListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, "127.0.0.1")
+
+				// Append to the list
+				clusters = append(clusters, c)
+				listeners = append(listeners, l)
+			}
+		}
 
 		snap.Clusters = cache.NewResources(time.Now().String(), []cache.Resource(clusters))
 		snap.Listeners = cache.NewResources(time.Now().String(), []cache.Resource(listeners))

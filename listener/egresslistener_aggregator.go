@@ -5,8 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/envoyproxy/go-control-plane/pkg/cache"
-	"github.com/ffilippopoulos/k8s-envoy-control-plane/cluster"
 	egresslistener_v1alpha1 "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/apis/egresslistener/v1alpha1"
 	egresslistener_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/watch"
@@ -64,16 +62,10 @@ func (sa *EgressListenerAggregator) Events() chan interface{} {
 	return sa.events
 }
 
-func (sa *EgressListenerAggregator) GenerateListenersAndClusters(nodeName string, clusters *cluster.ClusterAggregator) ([]cache.Resource, []cache.Resource) {
-	var cr []cache.Resource
-	var lr []cache.Resource
-
-	for name, listener := range sa.egressListenerStore.store {
-		if listener.nodeName == nodeName {
-			l, c := listener.Generate(name, clusters)
-			lr = append(lr, l)
-			cr = append(cr, c)
-		}
+func (sa *EgressListenerAggregator) List() []*EgressListener {
+	var listeners []*EgressListener
+	for _, l := range sa.egressListenerStore.store {
+		listeners = append(listeners, l)
 	}
-	return lr, cr
+	return listeners
 }

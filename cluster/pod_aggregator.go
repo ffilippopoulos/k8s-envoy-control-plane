@@ -1,13 +1,16 @@
 package cluster
 
 import (
-	"fmt"
+
 	//"log"
+
 	"sync"
 	"time"
 
 	//v1 "k8s.io/api/core/v1"
 	//"k8s.io/apimachinery/pkg/watch"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	//"k8s.io/client-go/tools/cache"
 )
@@ -39,23 +42,14 @@ func (sa *PodAggregator) Start() error {
 	return nil
 }
 
-//func (sa *PodAggregator) handler(eventType watch.EventType, old *v1.Pod, new *v1.Pod) {
-//	switch eventType {
-//	case watch.Added:
-//		log.Printf("[DEBUG] received %s event for %s ip: %s", eventType, new.Name, new.Status.PodIP)
-//	case watch.Modified:
-//		log.Printf("[DEBUG] received %s event for %s ip: %s", eventType, new.Name, new.Status.PodIP)
-//	case watch.Deleted:
-//		log.Printf("[DEBUG] received %s event for %s ip %s", eventType, old.Name, old.Status.PodIP)
-//	default:
-//		log.Printf("[DEBUG] received %s event: cannot handle", eventType)
-//	}
-//}
-
-func (sa *PodAggregator) List() {
-
+func (sa *PodAggregator) List() ([]v1.Pod, error) {
+	var pods []v1.Pod
 	for _, sw := range sa.podWatchers {
-		fmt.Println(sw.ListPodNames())
+		ps, err := sw.List()
+		if err != nil {
+			return nil, err
+		}
+		pods = append(pods, ps...)
 	}
-
+	return pods, nil
 }

@@ -8,6 +8,7 @@ type Endpoint struct {
 }
 
 type Cluster struct {
+	name      string
 	endpoints EndpointsSet
 }
 
@@ -36,7 +37,9 @@ func (cs *ClusterStore) CreateOrUpdate(clusterName, podName, podIP string) {
 
 	// If cluster does not exist add it
 	if c, ok := cs.store[clusterName]; !ok {
-		new := &Cluster{}
+		new := &Cluster{
+			name: clusterName,
+		}
 		new.endpoints = make(EndpointsSet)
 		new.endpoints[podName] = Endpoint{
 			podName: podName,
