@@ -12,3 +12,5 @@ RUN apk --no-cache add ca-certificates git go musl-dev && \
   (cd cmd/ && go build -ldflags '-s -extldflags "-static"' -o /k8s-envoy-control-plane .) && \
   apk del go git musl-dev && \
   rm -rf $GOPATH
+
+ENTRYPOINT [ "/k8s-envoy-control-plane" ]

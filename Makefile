@@ -21,9 +21,6 @@ local-envoy-mac:
 	--service-node test-app \
 	--service-cluster test-app-cluster
 
-docker-build:
-	@docker build -t quay.io/ffilippopoulos/k8s-envoy-control-plane .
-
 .PHONY: docker-image
 docker-image:
 	@docker build --rm=true -t $(REPO):$(VERSION) .
