@@ -1,8 +1,8 @@
 package listener
 
 import (
-	//log "github.com/Sirupsen/logrus"
 	"log"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -11,32 +11,57 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
-	ingresslistener_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
-	//ingresslistener_v1alpha1 "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/informers/externalversions/ingresslistener/v1alpha1"
+	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
+	"github.com/ffilippopoulos/k8s-envoy-control-plane/cluster"
 	ingresslistener_v1alpha1 "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/apis/ingresslistener/v1alpha1"
+	ingresslistener_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
 )
 
-type eventHandlerFunc func(eventType watch.EventType, old *ingresslistener_v1alpha1.IngressListener, new *ingresslistener_v1alpha1.IngressListener)
+type IngressListener struct {
+	nodeName         string
+	listenPort       int32
+	targetPort       int32
+	rbacAllowCluster string
+}
+
+func (il *IngressListener) Generate(name string, clusters *cluster.ClusterAggregator) (*v2.Listener, *v2.Cluster) {
+	rbacCluster, err := clusters.GetCluster(il.rbacAllowCluster)
+	if err != nil {
+		return &v2.Listener{}, &v2.Cluster{}
+	}
+
+	sourceIPs := rbacCluster.GetIPs()
+
+	// Make a cluster first to point at the local service on the target port
+	c := cluster.MakeCluster("ingress_"+name+"_cluster", il.targetPort, []string{"127.0.0.1"})
+
+	// Then a listener, restricted to sourceIPs
+	l := MakeTCPListener("ingress_"+name, il.listenPort, "local_"+name, sourceIPs, "0.0.0.0")
+
+	return l, c
+}
+
+type ingressListenerEventHandlerFunc func(eventType watch.EventType, old *ingresslistener_v1alpha1.IngressListener, new *ingresslistener_v1alpha1.IngressListener)
 
 type ingressListenerWatcher struct {
 	client       ingresslistener_clientset.Interface
-	eventHandler eventHandlerFunc
+	eventHandler ingressListenerEventHandlerFunc
 	resyncPeriod time.Duration
 	stopChannel  chan struct{}
 	store        cache.Store
 }
 
-func NewIngressListenerWatcher(client ingresslistener_clientset.Interface, resyncPeriod time.Duration) *ingressListenerWatcher {
+func NewIngressListenerWatcher(client ingresslistener_clientset.Interface, eventHandler ingressListenerEventHandlerFunc, resyncPeriod time.Duration) *ingressListenerWatcher {
 
 	return &ingressListenerWatcher{
 		client:       client,
-		eventHandler: handler,
+		eventHandler: eventHandler,
 		resyncPeriod: resyncPeriod,
 		stopChannel:  make(chan struct{}),
 	}
 }
 
-func (ilw *ingressListenerWatcher) Start() {
+func (ilw *ingressListenerWatcher) Start(wg *sync.WaitGroup) {
 
 	listWatch := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -60,6 +85,8 @@ func (ilw *ingressListenerWatcher) Start() {
 	}
 	store, controller := cache.NewInformer(listWatch, &ingresslistener_v1alpha1.IngressListener{}, ilw.resyncPeriod, eventHandler)
 	ilw.store = store
+	wg.Done()
+
 	log.Println("[INFO] starting ingressListener watcher")
 	go controller.Run(ilw.stopChannel)
 }
@@ -68,15 +95,25 @@ func (ilw *ingressListenerWatcher) List() {
 	log.Println(ilw.client.IngresslistenerV1alpha1().IngressListeners(v1.NamespaceAll).List(metav1.ListOptions{}))
 }
 
-func handler(eventType watch.EventType, old *ingresslistener_v1alpha1.IngressListener, new *ingresslistener_v1alpha1.IngressListener) {
-	switch eventType {
-	case watch.Added:
-		log.Printf("[DEBUG] received %s event for %s", eventType, new)
-	case watch.Modified:
-		log.Printf("[DEBUG] received %s event for %s", eventType, new)
-	case watch.Deleted:
-		log.Printf("[DEBUG] received %s event for %s", eventType, old)
-	default:
-		log.Printf("[DEBUG] received %s event: cannot handle", eventType)
+type IngressListenerStore struct {
+	store map[string]*IngressListener
+}
+
+func (ils *IngressListenerStore) Init() {
+	ils.store = make(map[string]*IngressListener)
+}
+
+func (ils *IngressListenerStore) CreateOrUpdate(listenerName, nodeName, rbacAllowCluster string, listenPort, targetPort int32) {
+	ils.store[listenerName] = &IngressListener{
+		nodeName:         nodeName,
+		listenPort:       listenPort,
+		targetPort:       targetPort,
+		rbacAllowCluster: rbacAllowCluster,
+	}
+}
+
+func (ils *IngressListenerStore) Delete(listenerName string) {
+	if _, ok := ils.store[listenerName]; ok {
+		delete(ils.store, listenerName)
 	}
 }

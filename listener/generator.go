@@ -9,13 +9,14 @@ import (
 	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
+	rbac_filter "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/rbac/v2"
 	tcp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
-	rbac "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v2alpha"
+	rbac "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v2"
 	"github.com/envoyproxy/go-control-plane/pkg/util"
 )
 
 // MakeTCPListener creates a TCP listener for a cluster.
-func MakeTCPListener(listenerName string, port uint32, clusterName string, source_ips []string) *v2.Listener {
+func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string) *v2.Listener {
 	// TCP filter configuration
 	config := &tcp.TcpProxy{
 		StatPrefix: "tcp",
@@ -35,38 +36,49 @@ func MakeTCPListener(listenerName string, port uint32, clusterName string, sourc
 		},
 	}}
 
-	//
-	if len(source_ips) > 0 {
+	if len(sourceIPs) > 0 {
 		// One principal per ip address
 		principals := []*rbac.Principal{}
-		for _, ip := range source_ips {
-			sourceIp := &core.CidrRange{
+		for _, ip := range sourceIPs {
+			sourceIP := &core.CidrRange{
 				AddressPrefix: ip,
 				PrefixLen:     &types.UInt32Value{Value: 32},
 			}
 			principals = append(principals, &rbac.Principal{
 				Identifier: &rbac.Principal_SourceIp{
-					SourceIp: sourceIp,
+					SourceIp: sourceIP,
 				},
 			})
 		}
 
+		permission := &rbac.Permission{
+			Rule: &rbac.Permission_Any{
+				Any: true,
+			},
+		}
+
 		// Sum them in one policy
 		policy := &rbac.Policy{
-			Principals: principals,
+			Permissions: []*rbac.Permission{permission},
+			Principals:  principals,
 		}
 
-		rbac := &rbac.RBAC{
-			Action:   rbac.RBAC_ALLOW,
-			Policies: map[string]*rbac.Policy{"source_ips": policy},
+		rbac := &rbac_filter.RBAC{
+			StatPrefix: "rbac_ingress",
+			Rules: &rbac.RBAC{
+				Action:   rbac.RBAC_ALLOW,
+				Policies: map[string]*rbac.Policy{"source_ips": policy},
+			},
 		}
-		rbac_filter := listener.Filter{
+
+		rbacFilter := listener.Filter{
 			Name: "envoy.filters.network.rbac",
+			ConfigType: &listener.Filter_Config{
+				Config: MessageToStruct(rbac),
+			},
 		}
 
-		rbac_filter.ConfigType = &listener.Filter_Config{Config: MessageToStruct(rbac)}
-
-		filters = append(filters, rbac_filter)
+		filters = append(filters, rbacFilter)
 	}
 
 	return &v2.Listener{
@@ -75,9 +87,9 @@ func MakeTCPListener(listenerName string, port uint32, clusterName string, sourc
 			Address: &core.Address_SocketAddress{
 				SocketAddress: &core.SocketAddress{
 					Protocol: core.TCP,
-					Address:  "127.0.0.1",
+					Address:  listenAddress,
 					PortSpecifier: &core.SocketAddress_PortValue{
-						PortValue: port,
+						PortValue: uint32(port),
 					},
 				},
 			},

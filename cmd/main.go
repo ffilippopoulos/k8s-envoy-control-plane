@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"sync"
-	"time"
 
 	discover "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2"
 	"google.golang.org/grpc"
@@ -59,28 +58,33 @@ func main() {
 		log.Fatal("Reading sources config failed: ", err)
 	}
 
-	sources := []kubernetes.Interface{}
-	var ilClient custom_clientset.Interface
+	clusterSources := []kubernetes.Interface{}
+	listenerSources := []custom_clientset.Interface{}
 
 	for _, s := range k8sSources {
-
 		client, err := cluster.GetClient(s.KubeConfig)
 		if err != nil {
 			log.Fatal(fmt.Sprintf("getting client for k8s cluster: %s failed", s.Name), err)
 		}
 
-		sources = append(sources, client)
+		clusterSources = append(clusterSources, client)
 
-		if s.Role == "primary" {
-			ilClient, _ = listener.GetClient(s.KubeConfig)
+		lClient, err := listener.GetClient(s.KubeConfig)
+		if err != nil {
+			log.Fatal(fmt.Sprintf("getting client for k8s cluster: %s failed", s.Name), err)
 		}
+
+		listenerSources = append(listenerSources, lClient)
 	}
 
-	ca := cluster.NewClusterAggregator(sources, *flagClusterNameAnno)
+	ca := cluster.NewClusterAggregator(clusterSources, *flagClusterNameAnno)
 	ca.Start()
 
-	ilw := listener.NewIngressListenerWatcher(ilClient, time.Minute)
-	ilw.Start()
+	il := listener.NewIngressListenerAggregator(listenerSources)
+	il.Start()
+
+	el := listener.NewEgressListenerAggregator(listenerSources)
+	el.Start()
 
 	grpcServer := grpc.NewServer()
 	lis, err := net.Listen("tcp", ":18000")
@@ -90,10 +94,11 @@ func main() {
 	hash := Hasher{}
 
 	envoyCache := cache.NewSnapshotCache(false, hash, nil)
-	snap := envoy.NewSnapshotter(envoyCache, ca)
+
+	snap := envoy.NewSnapshotter(envoyCache, ca, il, el)
 	snap.Start()
 
-	envoyServer := server.NewServer(envoyCache, &envoy.Callbacks{SnapshotCache: envoyCache, ClusterAggregator: ca})
+	envoyServer := server.NewServer(envoyCache, snap)
 
 	discover.RegisterAggregatedDiscoveryServiceServer(grpcServer, envoyServer)
 	v2.RegisterEndpointDiscoveryServiceServer(grpcServer, envoyServer)

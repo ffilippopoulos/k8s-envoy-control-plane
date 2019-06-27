@@ -43,7 +43,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	cs := &Clientset{}
+	cs := &Clientset{tracker: o}
 	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
@@ -65,10 +65,15 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 type Clientset struct {
 	testing.Fake
 	discovery *fakediscovery.FakeDiscovery
+	tracker   testing.ObjectTracker
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.discovery
+}
+
+func (c *Clientset) Tracker() testing.ObjectTracker {
+	return c.tracker
 }
 
 var _ clientset.Interface = &Clientset{}
@@ -78,17 +83,7 @@ func (c *Clientset) EgresslistenerV1alpha1() egresslistenerv1alpha1.Egresslisten
 	return &fakeegresslistenerv1alpha1.FakeEgresslistenerV1alpha1{Fake: &c.Fake}
 }
 
-// Egresslistener retrieves the EgresslistenerV1alpha1Client
-func (c *Clientset) Egresslistener() egresslistenerv1alpha1.EgresslistenerV1alpha1Interface {
-	return &fakeegresslistenerv1alpha1.FakeEgresslistenerV1alpha1{Fake: &c.Fake}
-}
-
 // IngresslistenerV1alpha1 retrieves the IngresslistenerV1alpha1Client
 func (c *Clientset) IngresslistenerV1alpha1() ingresslistenerv1alpha1.IngresslistenerV1alpha1Interface {
-	return &fakeingresslistenerv1alpha1.FakeIngresslistenerV1alpha1{Fake: &c.Fake}
-}
-
-// Ingresslistener retrieves the IngresslistenerV1alpha1Client
-func (c *Clientset) Ingresslistener() ingresslistenerv1alpha1.IngresslistenerV1alpha1Interface {
 	return &fakeingresslistenerv1alpha1.FakeIngresslistenerV1alpha1{Fake: &c.Fake}
 }

@@ -10,7 +10,6 @@ import (
 type K8sSource struct {
 	Name       string `json:"name"`
 	KubeConfig string `json:"kubeconfig"`
-	Role       string `json:"role"`
 }
 
 func LoadSourcesConfig(path string) ([]K8sSource, error) {

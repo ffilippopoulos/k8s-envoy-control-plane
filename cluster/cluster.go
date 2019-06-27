@@ -1,67 +1,24 @@
 package cluster
 
-import (
-	"time"
-
-	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
-	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
-	"github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
-)
-
 type EndpointsSet map[string]Endpoint
 
 type Endpoint struct {
 	podName string
-	podIp   string
+	podIP   string
 }
 
 type Cluster struct {
 	endpoints EndpointsSet
 }
 
-// Generate an envoy cluster
-func (cs *Cluster) Generate(name string) *v2.Cluster {
-	var endpoints []endpoint.LbEndpoint
+func (c *Cluster) GetIPs() []string {
+	var IPs []string
 
-	for _, e := range cs.endpoints {
-
-		localAddress := &core.Address{
-			Address: &core.Address_SocketAddress{
-				SocketAddress: &core.SocketAddress{
-					Address: e.podIp,
-					PortSpecifier: &core.SocketAddress_PortValue{
-						PortValue: 8080,
-					},
-				},
-			},
-		}
-
-		endpoints = append(endpoints, endpoint.LbEndpoint{
-			HostIdentifier: &endpoint.LbEndpoint_Endpoint{
-				Endpoint: &endpoint.Endpoint{
-					Address: localAddress,
-				},
-			},
-		})
+	for _, e := range c.endpoints {
+		IPs = append(IPs, e.podIP)
 	}
 
-	lEndpoints := []endpoint.LocalityLbEndpoints{{
-		LbEndpoints: endpoints,
-	}}
-
-	cluster := &v2.Cluster{
-		Name:           name,
-		ConnectTimeout: 5 * time.Second,
-		LoadAssignment: &v2.ClusterLoadAssignment{
-			ClusterName: name,
-			Endpoints:   lEndpoints,
-		},
-		//TlsContext:   tls,
-		HealthChecks: []*core.HealthCheck{},
-	}
-
-	return cluster
-
+	return IPs
 }
 
 type ClusterStore struct {
@@ -75,7 +32,7 @@ func (cs *ClusterStore) Init() {
 }
 
 // CreateOrUpdate creates or updates a cluster with the given endpoint
-func (cs *ClusterStore) CreateOrUpdate(clusterName, podName, podIp string) {
+func (cs *ClusterStore) CreateOrUpdate(clusterName, podName, podIP string) {
 
 	// If cluster does not exist add it
 	if c, ok := cs.store[clusterName]; !ok {
@@ -83,7 +40,7 @@ func (cs *ClusterStore) CreateOrUpdate(clusterName, podName, podIp string) {
 		new.endpoints = make(EndpointsSet)
 		new.endpoints[podName] = Endpoint{
 			podName: podName,
-			podIp:   podIp,
+			podIP:   podIP,
 		}
 		cs.store[clusterName] = new
 	} else {
@@ -91,7 +48,7 @@ func (cs *ClusterStore) CreateOrUpdate(clusterName, podName, podIp string) {
 		// if exist update the endpoints list
 		c.endpoints[podName] = Endpoint{
 			podName: podName,
-			podIp:   podIp,
+			podIP:   podIP,
 		}
 
 	}
