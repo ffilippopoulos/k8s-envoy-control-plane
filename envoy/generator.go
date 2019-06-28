@@ -219,8 +219,7 @@ func MakeRoute(routeName, clusterName string) *v2.RouteConfiguration {
 	}
 }
 
-// MakeCluster creates a cluster
-func MakeCluster(clusterName string, port int32, IPs []string) *v2.Cluster {
+func endpoints(IPs []string, port int32) []endpoint.LbEndpoint {
 	var endpoints []endpoint.LbEndpoint
 
 	for _, i := range IPs {
@@ -243,6 +242,14 @@ func MakeCluster(clusterName string, port int32, IPs []string) *v2.Cluster {
 		endpoints = append(endpoints, endpoint)
 	}
 
+	return endpoints
+}
+
+// MakeCluster creates a cluster
+func MakeCluster(clusterName string, port int32, IPs []string) *v2.Cluster {
+
+	endpoints := endpoints(IPs, port)
+
 	return &v2.Cluster{
 		Name:           clusterName,
 		ConnectTimeout: 5 * time.Second,
@@ -253,6 +260,25 @@ func MakeCluster(clusterName string, port int32, IPs []string) *v2.Cluster {
 			}},
 		},
 		HealthChecks: []*core.HealthCheck{},
+	}
+}
+
+// MakeCluster creates a cluster
+func MakeHttp2Cluster(clusterName string, port int32, IPs []string) *v2.Cluster {
+
+	endpoints := endpoints(IPs, port)
+
+	return &v2.Cluster{
+		Name:           clusterName,
+		ConnectTimeout: 5 * time.Second,
+		LoadAssignment: &v2.ClusterLoadAssignment{
+			ClusterName: clusterName,
+			Endpoints: []endpoint.LocalityLbEndpoints{{
+				LbEndpoints: endpoints,
+			}},
+		},
+		Http2ProtocolOptions: &core.Http2ProtocolOptions{},
+		HealthChecks:         []*core.HealthCheck{},
 	}
 }
 

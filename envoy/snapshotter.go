@@ -100,25 +100,27 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				}
 				targetClusterIPs := targetCluster.GetIPs()
 
-				// Generate a cluster to target the upstream cluster
-				clusterName := "egress_" + egressListener.Name + "_cluster"
-				c := MakeCluster(clusterName, egressListener.TargetPort, targetClusterIPs)
-
-				clusters = append(clusters, c)
-
 				if egressListener.LbPolicy == "http" {
+					// Generate a cluster to target the upstream cluster
+					clusterName := "egress_" + egressListener.Name + "_cluster"
+					c := MakeHttp2Cluster(clusterName, egressListener.TargetPort, targetClusterIPs)
+					clusters = append(clusters, c)
+
 					// Generate a listener to forward traffic to the cluster
 					l := MakeHttpListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, "127.0.0.1")
-
 					listeners = append(listeners, l)
 
 					// Generate routes, follow the convention of clusterName = route name
 					r := MakeRoute(clusterName, clusterName)
 					routes = append(routes, r)
 				} else {
+					// Generate a cluster to target the upstream cluster
+					clusterName := "egress_" + egressListener.Name + "_cluster"
+					c := MakeCluster(clusterName, egressListener.TargetPort, targetClusterIPs)
+					clusters = append(clusters, c)
+
 					// Generate a listener to forward traffic to the cluster
 					l := MakeTCPListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, "127.0.0.1")
-
 					listeners = append(listeners, l)
 				}
 			}
