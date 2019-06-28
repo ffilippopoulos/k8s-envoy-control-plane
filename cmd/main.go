@@ -69,12 +69,13 @@ func main() {
 
 		clusterSources = append(clusterSources, client)
 
-		lClient, err := listener.GetClient(s.KubeConfig)
-		if err != nil {
-			log.Fatal(fmt.Sprintf("getting client for k8s cluster: %s failed", s.Name), err)
+		if s.ListenerSource {
+			lClient, err := listener.GetClient(s.KubeConfig)
+			if err != nil {
+				log.Fatal(fmt.Sprintf("getting client for k8s cluster: %s failed", s.Name), err)
+			}
+			listenerSources = append(listenerSources, lClient)
 		}
-
-		listenerSources = append(listenerSources, lClient)
 	}
 
 	ca := cluster.NewClusterAggregator(clusterSources, *flagClusterNameAnno)
