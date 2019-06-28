@@ -8,8 +8,9 @@ import (
 )
 
 type K8sSource struct {
-	Name       string `json:"name"`
-	KubeConfig string `json:"kubeconfig"`
+	Name           string `json:"name"`
+	KubeConfig     string `json:"kubeconfig"`
+	ListenerSource bool   `json:"listenersource"`
 }
 
 func LoadSourcesConfig(path string) ([]K8sSource, error) {
