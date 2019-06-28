@@ -113,7 +113,7 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 
 				if egressListener.LbPolicy == "http" {
 					// Generate routes, follow the convention of clusterName = route name
-					r := MakeRoute(clusterName, egressListener.TargetCluster)
+					r := MakeRoute(clusterName, clusterName)
 					routes = append(routes, r)
 				}
 			}
