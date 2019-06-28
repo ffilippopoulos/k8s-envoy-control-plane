@@ -1,6 +1,7 @@
 package envoy
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -22,10 +23,7 @@ const (
 	XdsCluster = "xds_cluster"
 )
 
-// MakeTCPListener creates a TCP listener for a cluster.
-func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string, lbpolicy string) *v2.Listener {
-
-	filters := []listener.Filter{}
+func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
 
 	if len(sourceIPs) > 0 {
 		// One principal per ip address
@@ -62,80 +60,121 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 			},
 		}
 
-		rbacFilter := listener.Filter{
+		return listener.Filter{
 			Name: "envoy.filters.network.rbac",
 			ConfigType: &listener.Filter_Config{
 				Config: MessageToStruct(rbac),
 			},
-		}
+		}, nil
+	}
 
+	return listener.Filter{}, errors.New("Requested rbac for empty sources list")
+}
+
+// MakeTCPListener creates a TCP listener for a cluster.
+func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string) *v2.Listener {
+
+	filters := []listener.Filter{}
+
+	rbacFilter, err := ipRbacFilter(sourceIPs)
+	if err != nil {
+
+	} else {
 		filters = append(filters, rbacFilter)
 	}
 
-	// tcp/http filter should always go in the bottom of the chain
-	if lbpolicy == "http" {
+	// tcp filter should always go at the bottom of the chain
 
-		source := &core.ConfigSource{}
-		source.ConfigSourceSpecifier = &core.ConfigSource_ApiConfigSource{
-			ApiConfigSource: &core.ApiConfigSource{
-				ApiType: core.ApiConfigSource_GRPC,
-				GrpcServices: []*core.GrpcService{{
-					TargetSpecifier: &core.GrpcService_EnvoyGrpc_{
-						EnvoyGrpc: &core.GrpcService_EnvoyGrpc{ClusterName: XdsCluster},
+	// TCP filter configuration use by default
+	config := &tcp.TcpProxy{
+		StatPrefix: "tcp",
+		ClusterSpecifier: &tcp.TcpProxy_Cluster{
+			Cluster: clusterName,
+		},
+	}
+	pbst, err := types.MarshalAny(config)
+	if err != nil {
+		panic(err)
+	}
+
+	tcpFilter := listener.Filter{
+		Name: util.TCPProxy,
+		ConfigType: &listener.Filter_TypedConfig{
+			TypedConfig: pbst,
+		},
+	}
+
+	filters = append(filters, tcpFilter)
+
+	return &v2.Listener{
+		Name: listenerName,
+		Address: core.Address{
+			Address: &core.Address_SocketAddress{
+				SocketAddress: &core.SocketAddress{
+					Protocol: core.TCP,
+					Address:  listenAddress,
+					PortSpecifier: &core.SocketAddress_PortValue{
+						PortValue: uint32(port),
 					},
-				}},
-			},
-		}
-
-		manager := &hcm.HttpConnectionManager{
-			CodecType:  hcm.AUTO,
-			StatPrefix: "http",
-			RouteSpecifier: &hcm.HttpConnectionManager_Rds{
-				Rds: &hcm.Rds{
-					ConfigSource:    *source,
-					RouteConfigName: clusterName,
 				},
 			},
-			HttpFilters: []*hcm.HttpFilter{{
-				Name: util.Router,
-			}},
-		}
+		},
+		FilterChains: []listener.FilterChain{{
+			Filters: filters,
+		}},
+	}
+}
 
-		pbst, err := types.MarshalAny(manager)
-		if err != nil {
-			panic(err)
-		}
+// MakeHttpListener creates an Http listener for a cluster.
+func MakeHttpListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string) *v2.Listener {
+	filters := []listener.Filter{}
 
-		httpFilter := listener.Filter{
-			Name: util.HTTPConnectionManager,
-			ConfigType: &listener.Filter_TypedConfig{
-				TypedConfig: pbst,
-			},
-		}
-		filters = append(filters, httpFilter)
+	rbacFilter, err := ipRbacFilter(sourceIPs)
+	if err != nil {
 
 	} else {
-		// TCP filter configuration use by default
-		config := &tcp.TcpProxy{
-			StatPrefix: "tcp",
-			ClusterSpecifier: &tcp.TcpProxy_Cluster{
-				Cluster: clusterName,
-			},
-		}
-		pbst, err := types.MarshalAny(config)
-		if err != nil {
-			panic(err)
-		}
-
-		tcpFilter := listener.Filter{
-			Name: util.TCPProxy,
-			ConfigType: &listener.Filter_TypedConfig{
-				TypedConfig: pbst,
-			},
-		}
-
-		filters = append(filters, tcpFilter)
+		filters = append(filters, rbacFilter)
 	}
+
+	// http filter should always go at the bottom of the chain
+	source := &core.ConfigSource{}
+	source.ConfigSourceSpecifier = &core.ConfigSource_ApiConfigSource{
+		ApiConfigSource: &core.ApiConfigSource{
+			ApiType: core.ApiConfigSource_GRPC,
+			GrpcServices: []*core.GrpcService{{
+				TargetSpecifier: &core.GrpcService_EnvoyGrpc_{
+					EnvoyGrpc: &core.GrpcService_EnvoyGrpc{ClusterName: XdsCluster},
+				},
+			}},
+		},
+	}
+
+	manager := &hcm.HttpConnectionManager{
+		CodecType:  hcm.AUTO,
+		StatPrefix: "http",
+		RouteSpecifier: &hcm.HttpConnectionManager_Rds{
+			Rds: &hcm.Rds{
+				ConfigSource:    *source,
+				RouteConfigName: clusterName,
+			},
+		},
+		HttpFilters: []*hcm.HttpFilter{{
+			Name: util.Router,
+		}},
+	}
+
+	pbst, err := types.MarshalAny(manager)
+	if err != nil {
+		panic(err)
+	}
+
+	httpFilter := listener.Filter{
+		Name: util.HTTPConnectionManager,
+		ConfigType: &listener.Filter_TypedConfig{
+			TypedConfig: pbst,
+		},
+	}
+	filters = append(filters, httpFilter)
 
 	return &v2.Listener{
 		Name: listenerName,

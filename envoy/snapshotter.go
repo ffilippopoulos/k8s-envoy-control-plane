@@ -80,7 +80,7 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				c := MakeCluster(clusterName, ingressListener.TargetPort, []string{"127.0.0.1"})
 
 				// Generate a listener to forward traffic to the cluster
-				l := MakeTCPListener("ingress_"+ingressListener.Name, ingressListener.ListenPort, clusterName, rbacClusterIPs, "0.0.0.0", "tcp")
+				l := MakeTCPListener("ingress_"+ingressListener.Name, ingressListener.ListenPort, clusterName, rbacClusterIPs, "0.0.0.0")
 
 				// Append to the list
 				clusters = append(clusters, c)
@@ -104,17 +104,22 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				clusterName := "egress_" + egressListener.Name + "_cluster"
 				c := MakeCluster(clusterName, egressListener.TargetPort, targetClusterIPs)
 
-				// Generate a listener to forward traffic to the cluster
-				l := MakeTCPListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, "127.0.0.1", egressListener.LbPolicy)
-
-				// Append to the list
 				clusters = append(clusters, c)
-				listeners = append(listeners, l)
 
 				if egressListener.LbPolicy == "http" {
+					// Generate a listener to forward traffic to the cluster
+					l := MakeHttpListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, "127.0.0.1")
+
+					listeners = append(listeners, l)
+
 					// Generate routes, follow the convention of clusterName = route name
 					r := MakeRoute(clusterName, clusterName)
 					routes = append(routes, r)
+				} else {
+					// Generate a listener to forward traffic to the cluster
+					l := MakeTCPListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, "127.0.0.1")
+
+					listeners = append(listeners, l)
 				}
 			}
 		}
