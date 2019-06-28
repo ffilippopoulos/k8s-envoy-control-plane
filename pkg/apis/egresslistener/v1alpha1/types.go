@@ -34,6 +34,7 @@ type EgressListenerSpec struct {
 	ListenPort    *int32 `json:"listenport"`
 	TargetPort    *int32 `json:"targetport"`
 	TargetCluster string `json:"targetcluster"`
+	LbPolicy      string `json:"lbpolicy"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

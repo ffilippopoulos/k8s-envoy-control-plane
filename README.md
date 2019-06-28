@@ -108,6 +108,7 @@ spec:
   listenport: 9090
   targetport: 8080
   targetcluster: test-cluster
+  lbpolicy: tcp
 ```
 An `EgressListener`creates a local listener on `127.0.0.1` that routes traffic to the cluster defined by `targetcluster` on
 `targetport`.

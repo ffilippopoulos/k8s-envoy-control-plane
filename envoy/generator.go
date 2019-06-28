@@ -8,6 +8,8 @@ import (
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
+	"github.com/envoyproxy/go-control-plane/envoy/api/v2/route"
+	hcm "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/http_connection_manager/v2"
 	rbac_filter "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/rbac/v2"
 	tcp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
 	rbac "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v2"
@@ -16,19 +18,12 @@ import (
 	"github.com/gogo/protobuf/types"
 )
 
+const (
+	XdsCluster = "xds_cluster"
+)
+
 // MakeTCPListener creates a TCP listener for a cluster.
-func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string) *v2.Listener {
-	// TCP filter configuration
-	config := &tcp.TcpProxy{
-		StatPrefix: "tcp",
-		ClusterSpecifier: &tcp.TcpProxy_Cluster{
-			Cluster: clusterName,
-		},
-	}
-	pbst, err := types.MarshalAny(config)
-	if err != nil {
-		panic(err)
-	}
+func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string, lbpolicy string) *v2.Listener {
 
 	filters := []listener.Filter{}
 
@@ -77,15 +72,70 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 		filters = append(filters, rbacFilter)
 	}
 
-	// tcp filter should always go in the bottom of the chain
-	tcpFilter := listener.Filter{
-		Name: util.TCPProxy,
-		ConfigType: &listener.Filter_TypedConfig{
-			TypedConfig: pbst,
-		},
-	}
+	// tcp/http filter should always go in the bottom of the chain
+	if lbpolicy == "http" {
 
-	filters = append(filters, tcpFilter)
+		source := &core.ConfigSource{}
+		source.ConfigSourceSpecifier = &core.ConfigSource_ApiConfigSource{
+			ApiConfigSource: &core.ApiConfigSource{
+				ApiType: core.ApiConfigSource_GRPC,
+				GrpcServices: []*core.GrpcService{{
+					TargetSpecifier: &core.GrpcService_EnvoyGrpc_{
+						EnvoyGrpc: &core.GrpcService_EnvoyGrpc{ClusterName: XdsCluster},
+					},
+				}},
+			},
+		}
+
+		manager := &hcm.HttpConnectionManager{
+			CodecType:  hcm.AUTO,
+			StatPrefix: "http",
+			RouteSpecifier: &hcm.HttpConnectionManager_Rds{
+				Rds: &hcm.Rds{
+					ConfigSource:    *source,
+					RouteConfigName: clusterName,
+				},
+			},
+			HttpFilters: []*hcm.HttpFilter{{
+				Name: util.Router,
+			}},
+		}
+
+		pbst, err := types.MarshalAny(manager)
+		if err != nil {
+			panic(err)
+		}
+
+		httpFilter := listener.Filter{
+			Name: util.HTTPConnectionManager,
+			ConfigType: &listener.Filter_TypedConfig{
+				TypedConfig: pbst,
+			},
+		}
+		filters = append(filters, httpFilter)
+
+	} else {
+		// TCP filter configuration use by default
+		config := &tcp.TcpProxy{
+			StatPrefix: "tcp",
+			ClusterSpecifier: &tcp.TcpProxy_Cluster{
+				Cluster: clusterName,
+			},
+		}
+		pbst, err := types.MarshalAny(config)
+		if err != nil {
+			panic(err)
+		}
+
+		tcpFilter := listener.Filter{
+			Name: util.TCPProxy,
+			ConfigType: &listener.Filter_TypedConfig{
+				TypedConfig: pbst,
+			},
+		}
+
+		filters = append(filters, tcpFilter)
+	}
 
 	return &v2.Listener{
 		Name: listenerName,
@@ -102,6 +152,30 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 		},
 		FilterChains: []listener.FilterChain{{
 			Filters: filters,
+		}},
+	}
+}
+
+func MakeRoute(routeName, clusterName string) *v2.RouteConfiguration {
+	return &v2.RouteConfiguration{
+		Name: routeName,
+		VirtualHosts: []route.VirtualHost{{
+			Name:    routeName,
+			Domains: []string{"*"},
+			Routes: []route.Route{{
+				Match: route.RouteMatch{
+					PathSpecifier: &route.RouteMatch_Prefix{
+						Prefix: "/",
+					},
+				},
+				Action: &route.Route_Route{
+					Route: &route.RouteAction{
+						ClusterSpecifier: &route.RouteAction_Cluster{
+							Cluster: clusterName,
+						},
+					},
+				},
+			}},
 		}},
 	}
 }

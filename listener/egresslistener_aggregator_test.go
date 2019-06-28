@@ -38,6 +38,7 @@ func TestEgressListenerListReturnsWithOneObject(t *testing.T) {
 			ListenPort:    &listenPort,
 			TargetPort:    &targetPort,
 			TargetCluster: "test-cluster",
+			LbPolicy:      "policy",
 		},
 	})
 
@@ -66,6 +67,7 @@ func TestEgressListenerListReturnsFromMultipleWatchers(t *testing.T) {
 				ListenPort:    &listenPort,
 				TargetPort:    &targetPort,
 				TargetCluster: "test-cluster",
+				LbPolicy:      "policy",
 			},
 		}
 		new.Name = "foobar" + string(i)
@@ -95,6 +97,7 @@ func TestEgressListenerListDoesntReturnDeletedObject(t *testing.T) {
 			ListenPort:    &listenPort,
 			TargetPort:    &targetPort,
 			TargetCluster: "test-cluster",
+			LbPolicy:      "policy",
 		},
 	}
 	l.Name = "foobar"
@@ -124,6 +127,7 @@ func TestEgressListenerListReturnsUpdatedObject(t *testing.T) {
 			ListenPort:    &listenPort,
 			TargetPort:    &targetPort,
 			TargetCluster: "test-cluster",
+			LbPolicy:      "policy",
 		},
 	}
 	l.Name = "foobar"

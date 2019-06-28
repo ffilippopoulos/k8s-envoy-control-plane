@@ -7,3 +7,4 @@ spec:
   listenport: 9090
   targetport: 8080
   targetcluster: test-cluster
+  lbpolicy: "tcp"
