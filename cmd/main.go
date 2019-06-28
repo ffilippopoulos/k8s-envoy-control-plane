@@ -25,7 +25,7 @@ import (
 var (
 	// flags
 	flagSourcesConfigPath = flag.String("sources", "", "(Required) Path of the config file that keeps static sources configuration")
-	flagClusterNameAnno   = flag.String("cluster-name-annotation", "cluster-name.envoy.uw.io", "(Required) Annotation that will mark a pod as part of a cluster")
+	flagClusterNameAnno   = flag.String("cluster-name-annotation", "cluster-name.envoy.uw.io", "Annotation that will mark a pod as part of a cluster")
 )
 
 // Hasher hashes

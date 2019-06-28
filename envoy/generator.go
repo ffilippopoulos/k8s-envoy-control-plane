@@ -30,12 +30,7 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 		panic(err)
 	}
 
-	filters := []listener.Filter{{
-		Name: util.TCPProxy,
-		ConfigType: &listener.Filter_TypedConfig{
-			TypedConfig: pbst,
-		},
-	}}
+	filters := []listener.Filter{}
 
 	if len(sourceIPs) > 0 {
 		// One principal per ip address
@@ -81,6 +76,16 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 
 		filters = append(filters, rbacFilter)
 	}
+
+	// tcp filter should always go in the bottom of the chain
+	tcpFilter := listener.Filter{
+		Name: util.TCPProxy,
+		ConfigType: &listener.Filter_TypedConfig{
+			TypedConfig: pbst,
+		},
+	}
+
+	filters = append(filters, tcpFilter)
 
 	return &v2.Listener{
 		Name: listenerName,

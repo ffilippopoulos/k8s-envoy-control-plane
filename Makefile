@@ -2,7 +2,7 @@ VERSION=$(shell git describe --tags --match=v* --always --dirty)
 REPO=quay.io/ffilippopoulos/k8s-envoy-control-plane
 
 run:
-	@bash -c "cd cmd/ && go run main.go config.go -cluster-name-annotation cluster-name.envoy.uw.io -sources ../config.json"
+	@bash -c "cd cmd/ && go run main.go config.go -cluster-name-annotation cluster-name.envoy.uw.io -sources ../config.example.json"
 
 local-envoy:
 	@docker run -it \
