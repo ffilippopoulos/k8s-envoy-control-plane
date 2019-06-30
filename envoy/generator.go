@@ -126,7 +126,7 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 }
 
 // MakeHttpListener creates an Http listener for a cluster.
-func MakeHttpListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string) *v2.Listener {
+func MakeHttpListener(listenerName string, port int32, routeName string, sourceIPs []string, listenAddress string) *v2.Listener {
 	filters := []listener.Filter{}
 
 	rbacFilter, err := ipRbacFilter(sourceIPs)
@@ -155,7 +155,7 @@ func MakeHttpListener(listenerName string, port int32, clusterName string, sourc
 		RouteSpecifier: &hcm.HttpConnectionManager_Rds{
 			Rds: &hcm.Rds{
 				ConfigSource:    *source,
-				RouteConfigName: clusterName,
+				RouteConfigName: routeName,
 			},
 		},
 		HttpFilters: []*hcm.HttpFilter{{
