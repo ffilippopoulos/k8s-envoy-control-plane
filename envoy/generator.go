@@ -19,10 +19,6 @@ import (
 	"github.com/gogo/protobuf/types"
 )
 
-const (
-	XdsCluster = "xds_cluster"
-)
-
 func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
 
 	if len(sourceIPs) > 0 {
@@ -126,7 +122,7 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 }
 
 // MakeHttpListener creates an Http listener for a cluster.
-func MakeHttpListener(listenerName string, port int32, routeName string, sourceIPs []string, listenAddress string) *v2.Listener {
+func MakeHttpListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string) *v2.Listener {
 	filters := []listener.Filter{}
 
 	rbacFilter, err := ipRbacFilter(sourceIPs)
@@ -136,27 +132,12 @@ func MakeHttpListener(listenerName string, port int32, routeName string, sourceI
 		filters = append(filters, rbacFilter)
 	}
 
-	// http filter should always go at the bottom of the chain
-	source := &core.ConfigSource{}
-	source.ConfigSourceSpecifier = &core.ConfigSource_ApiConfigSource{
-		ApiConfigSource: &core.ApiConfigSource{
-			ApiType: core.ApiConfigSource_GRPC,
-			GrpcServices: []*core.GrpcService{{
-				TargetSpecifier: &core.GrpcService_EnvoyGrpc_{
-					EnvoyGrpc: &core.GrpcService_EnvoyGrpc{ClusterName: XdsCluster},
-				},
-			}},
-		},
-	}
-
 	manager := &hcm.HttpConnectionManager{
 		CodecType:  hcm.AUTO,
 		StatPrefix: "http",
-		RouteSpecifier: &hcm.HttpConnectionManager_Rds{
-			Rds: &hcm.Rds{
-				ConfigSource:    *source,
-				RouteConfigName: routeName,
-			},
+		RouteSpecifier: &hcm.HttpConnectionManager_RouteConfig{
+			// Name route after cluster
+			RouteConfig: MakeRoute(clusterName, clusterName),
 		},
 		HttpFilters: []*hcm.HttpFilter{{
 			Name: util.Router,
@@ -174,6 +155,7 @@ func MakeHttpListener(listenerName string, port int32, routeName string, sourceI
 			TypedConfig: pbst,
 		},
 	}
+	// http filter should always go at the bottom of the chain
 	filters = append(filters, httpFilter)
 
 	return &v2.Listener{

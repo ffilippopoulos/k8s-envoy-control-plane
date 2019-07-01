@@ -108,13 +108,8 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 					c := MakeHttp2Cluster(clusterName, egressListener.TargetPort, targetClusterIPs)
 					clusters = append(clusters, c)
 
-					// Generate a route to target the upstream cluster
-					routeName := "egress_" + egressListener.Name + "_route"
-					r := MakeRoute(routeName, clusterName)
-					routes = append(routes, r)
-
 					// Generate a listener to forward traffic to the cluster
-					l := MakeHttpListener("egress_"+egressListener.Name, egressListener.ListenPort, routeName, []string{"127.0.0.1"}, "127.0.0.1")
+					l := MakeHttpListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, "127.0.0.1")
 					listeners = append(listeners, l)
 
 				} else {
