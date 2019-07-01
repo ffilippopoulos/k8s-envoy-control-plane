@@ -62,7 +62,6 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 
 		var clusters []cache.Resource
 		var listeners []cache.Resource
-		var routes []cache.Resource
 
 		// Create ingress listeners for the node
 		for _, ingressListener := range s.ingressListeners.List() {
@@ -125,7 +124,6 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 
 		snap.Clusters = cache.NewResources(time.Now().String(), []cache.Resource(clusters))
 		snap.Listeners = cache.NewResources(time.Now().String(), []cache.Resource(listeners))
-		snap.Routes = cache.NewResources(time.Now().String(), []cache.Resource(routes))
 
 		s.snapshotCache.SetSnapshot(node, snap)
 	}
