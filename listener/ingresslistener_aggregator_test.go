@@ -32,7 +32,7 @@ func TestIngressListenerListReturnsWithOneObject(t *testing.T) {
 	// Add a listener
 	listenPort := int32(8080)
 	targetPort := int32(8081)
-	il.handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, &ingresslistener_v1alpha1.IngressListener{
+	il.Handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, &ingresslistener_v1alpha1.IngressListener{
 		Spec: ingresslistener_v1alpha1.IngressListenerSpec{
 			NodeName:         "foobar",
 			ListenPort:       &listenPort,
@@ -98,10 +98,10 @@ func TestIngressListenerListDoesntReturnDeletedObject(t *testing.T) {
 		},
 	}
 	l.Name = "foobar"
-	il.handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, l)
+	il.Handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, l)
 
 	// Remove the listener
-	il.handler(watch.Deleted, l, l)
+	il.Handler(watch.Deleted, l, l)
 
 	ingressListeners := il.List()
 	if len(ingressListeners) != 0 {
@@ -127,11 +127,11 @@ func TestIngressListenerListReturnsUpdatedObject(t *testing.T) {
 		},
 	}
 	l.Name = "foobar"
-	il.handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, l)
+	il.Handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, l)
 
 	// Update the listener
 	l.Spec.RbacAllowCluster = "different-cluster"
-	il.handler(watch.Modified, &ingresslistener_v1alpha1.IngressListener{}, l)
+	il.Handler(watch.Modified, &ingresslistener_v1alpha1.IngressListener{}, l)
 
 	ingressListeners := il.List()
 	if len(ingressListeners) != 1 {

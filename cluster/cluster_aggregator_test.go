@@ -38,7 +38,7 @@ func TestClusterAggregatorListReturnsWithOneObject(t *testing.T) {
 	}
 	pod.Name = "pod-1"
 	pod.Annotations = map[string]string{"cluster-name.envoy.uw.io": "test-cluster"}
-	ca.handler(watch.Added, &v1.Pod{}, pod)
+	ca.Handler(watch.Added, &v1.Pod{}, pod)
 
 	// Check that a cluster is returned
 	clusters := ca.List()
@@ -137,7 +137,7 @@ func TestClusterAggregatorListDoesntReturnUnwantedObject(t *testing.T) {
 	}
 	pod.Name = "pod-1"
 	pod.Annotations = map[string]string{"different-annotation.envoy.uw.io": "test-cluster"}
-	ca.handler(watch.Added, &v1.Pod{}, pod)
+	ca.Handler(watch.Added, &v1.Pod{}, pod)
 
 	// Check that a cluster hasn't been created for the pod
 	clusters := ca.List()
@@ -161,10 +161,10 @@ func TestClusterAggregatorListDoesntReturnDeletedObject(t *testing.T) {
 	}
 	pod.Name = "pod-1"
 	pod.Annotations = map[string]string{"cluster-name.envoy.uw.io": "test-cluster"}
-	ca.handler(watch.Added, &v1.Pod{}, pod)
+	ca.Handler(watch.Added, &v1.Pod{}, pod)
 
 	// Remove the pod
-	ca.handler(watch.Deleted, pod, pod)
+	ca.Handler(watch.Deleted, pod, pod)
 
 	// Check that the cluster was removed
 	clusters := ca.List()
@@ -188,11 +188,11 @@ func TestClusterAggregatorListReturnsUpdatedObject(t *testing.T) {
 	}
 	pod.Name = "pod-1"
 	pod.Annotations = map[string]string{"cluster-name.envoy.uw.io": "test-cluster"}
-	ca.handler(watch.Added, &v1.Pod{}, pod)
+	ca.Handler(watch.Added, &v1.Pod{}, pod)
 
 	// Update the pod IP
 	pod.Status.PodIP = "10.2.0.44"
-	ca.handler(watch.Modified, pod, pod)
+	ca.Handler(watch.Modified, pod, pod)
 
 	// Check the cluster exists
 	clusters := ca.List()

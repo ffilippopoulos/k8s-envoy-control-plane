@@ -24,7 +24,7 @@ func NewClusterAggregator(sources []kubernetes.Interface, clusterAnnotation stri
 		events:            make(chan interface{}),
 	}
 
-	pa := NewPodAggregator(sources, ca.handler)
+	pa := NewPodAggregator(sources, ca.Handler)
 	ca.podAggregator = pa
 
 	return ca
@@ -35,7 +35,7 @@ func (ca *ClusterAggregator) Start() error {
 	return ca.podAggregator.Start()
 }
 
-func (ca *ClusterAggregator) handler(eventType watch.EventType, old *v1.Pod, new *v1.Pod) {
+func (ca *ClusterAggregator) Handler(eventType watch.EventType, old *v1.Pod, new *v1.Pod) {
 	switch eventType {
 	case watch.Added:
 		if clusterName, ok := new.Annotations[ca.clusterAnnotation]; ok {

@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  envoy-cp:
+    build:
+      context: ../.
+      dockerfile: ./Dockerfile-deps-integration
+    volumes:
+      - .:/go/src/github.com/ffilippopoulos/k8s-envoy-control-plane/integration
+    working_dir: /go/src/github.com/ffilippopoulos/k8s-envoy-control-plane/integration
+    ports:
+      - "18000:18000"
+    command:
+      - go
+      - test
+      - -v
+      - ./...
+
+  envoy:
+    image: envoyproxy/envoy-alpine:v1.11.1
+    volumes:
+      - ./config:/etc/envoy
+    ports:
+      - "9901:9901"
+    command:
+      - envoy
+      - -c /etc/envoy/envoy.yaml
+      - --service-node test-client
+      - --service-cluster test-cluster
