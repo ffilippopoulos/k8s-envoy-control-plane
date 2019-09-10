@@ -49,15 +49,16 @@ func TestListenerIPRbac(t *testing.T) {
 	// Add a lsitener that allows the cluster
 	listenPort := int32(8080)
 	targetPort := int32(8081)
-	il.Handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, &ingresslistener_v1alpha1.IngressListener{
+	newListener := &ingresslistener_v1alpha1.IngressListener{
 		Spec: ingresslistener_v1alpha1.IngressListenerSpec{
 			NodeName:         "test-client",
 			ListenPort:       &listenPort,
 			TargetPort:       &targetPort,
 			RbacAllowCluster: "test-cluster",
 		},
-	})
-
+	}
+	newListener.Name = "test"
+	il.Handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, newListener)
 	// sleep to allow config to be propagated down to the node
 	time.Sleep(3 * time.Second)
 
@@ -67,7 +68,7 @@ func TestListenerIPRbac(t *testing.T) {
 		t.Fatal(err)
 	}
 	listeners, _ := ioutil.ReadAll(resp.Body)
-	expected := "ingress_::0.0.0.0:8080\n"
+	expected := "ingress_test::0.0.0.0:8080\n"
 	assert.Equal(t, expected, string(listeners), "Listener not propagated")
 
 	//wg := sync.WaitGroup{}
