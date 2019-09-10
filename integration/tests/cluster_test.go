@@ -3,7 +3,6 @@ package tests
 import (
 	"io/ioutil"
 	"net/http"
-	//"sync"
 	"testing"
 	"time"
 
@@ -70,8 +69,4 @@ func TestListenerIPRbac(t *testing.T) {
 	listeners, _ := ioutil.ReadAll(resp.Body)
 	expected := "ingress_test::0.0.0.0:8080\n"
 	assert.Equal(t, expected, string(listeners), "Listener not propagated")
-
-	//wg := sync.WaitGroup{}
-	//wg.Add(1)
-	//wg.Wait()
 }
