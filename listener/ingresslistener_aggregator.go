@@ -21,7 +21,7 @@ func NewIngressListenerAggregator(sources []ingresslistener_clientset.Interface)
 		events: make(chan interface{}),
 	}
 	for _, s := range sources {
-		sw := NewIngressListenerWatcher(s, sa.handler, time.Minute)
+		sw := NewIngressListenerWatcher(s, sa.Handler, time.Minute)
 		sa.ingressListenerWatchers = append(sa.ingressListenerWatchers, sw)
 	}
 	return sa
@@ -39,7 +39,7 @@ func (sa *IngressListenerAggregator) Start() error {
 	return nil
 }
 
-func (sa *IngressListenerAggregator) handler(eventType watch.EventType, old *ingresslistener_v1alpha1.IngressListener, new *ingresslistener_v1alpha1.IngressListener) {
+func (sa *IngressListenerAggregator) Handler(eventType watch.EventType, old *ingresslistener_v1alpha1.IngressListener, new *ingresslistener_v1alpha1.IngressListener) {
 	switch eventType {
 	case watch.Added:
 		log.Printf("[DEBUG] received %s event for ingress listener %s: 0.0.0.0:%d -> 127.0.0.1:%d", eventType, new.Name, *new.Spec.ListenPort, *new.Spec.TargetPort)

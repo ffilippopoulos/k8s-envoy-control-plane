@@ -4,22 +4,13 @@ REPO=quay.io/ffilippopoulos/k8s-envoy-control-plane
 run:
 	@bash -c "cd cmd/ && go run main.go config.go -cluster-name-annotation cluster-name.envoy.uw.io -sources ../config.example.json"
 
-local-envoy:
-	@docker run -it \
-	--network host \
-	-v ${PWD}/sample/envoy:/etc/envoy envoyproxy/envoy-alpine:v1.10.0 \
-	-c /etc/envoy/envoy.yaml \
-	-l debug \
-	--service-node test-app \
-	--service-cluster test-app-cluster
+.PHONY: build-integration
+build-integration:
+	@docker-compose -f integration/docker-compose.yaml build
 
-local-envoy-mac:
-	@docker run -it -p 9901:9901 \
-	-v ${PWD}/sample/envoy:/etc/envoy envoyproxy/envoy-alpine:v1.10.0 \
-	-c /etc/envoy/envoy-mac.yaml \
-	-l debug \
-	--service-node test-app \
-	--service-cluster test-app-cluster
+.PHONY: integration
+integration:
+	@docker-compose -f integration/docker-compose.yaml up --exit-code-from envoy-cp
 
 .PHONY: docker-image
 docker-image:
