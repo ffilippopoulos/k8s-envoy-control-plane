@@ -6,6 +6,7 @@ import (
 	"time"
 
 	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
+	"github.com/envoyproxy/go-control-plane/envoy/api/v2/auth"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
@@ -17,6 +18,8 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/util"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
+
+	"github.com/ffilippopoulos/k8s-envoy-control-plane/tls"
 )
 
 func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
@@ -67,8 +70,42 @@ func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
 	return listener.Filter{}, errors.New("Requested rbac for empty sources list")
 }
 
+func MakeDownstreamTlsContect(cert tls.Certificate) *auth.DownstreamTlsContext {
+	tlsContext := &auth.DownstreamTlsContext{}
+	tlsContext.CommonTlsContext = &auth.CommonTlsContext{
+		TlsCertificates: []*auth.TlsCertificate{
+			&auth.TlsCertificate{
+				CertificateChain: &core.DataSource{
+					Specifier: &core.DataSource_InlineString{InlineString: cert.Cert},
+				},
+				PrivateKey: &core.DataSource{
+					Specifier: &core.DataSource_InlineString{InlineString: cert.Key},
+				},
+			},
+		},
+	}
+	return tlsContext
+}
+
+func MakeUpstreamTlsContect(cert tls.Certificate) *auth.UpstreamTlsContext {
+	tlsContext := &auth.UpstreamTlsContext{}
+	tlsContext.CommonTlsContext = &auth.CommonTlsContext{
+		TlsCertificates: []*auth.TlsCertificate{
+			&auth.TlsCertificate{
+				CertificateChain: &core.DataSource{
+					Specifier: &core.DataSource_InlineString{InlineString: cert.Cert},
+				},
+				PrivateKey: &core.DataSource{
+					Specifier: &core.DataSource_InlineString{InlineString: cert.Key},
+				},
+			},
+		},
+	}
+	return tlsContext
+}
+
 // MakeTCPListener creates a TCP listener for a cluster.
-func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string) *v2.Listener {
+func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string, cert tls.Certificate) *v2.Listener {
 
 	filters := []listener.Filter{}
 
@@ -102,6 +139,15 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 
 	filters = append(filters, tcpFilter)
 
+	filterChain := listener.FilterChain{
+		Filters: filters,
+	}
+
+	if cert.Cert != "" && cert.Key != "" {
+		tlsContext := MakeDownstreamTlsContect(cert)
+		filterChain.TlsContext = tlsContext
+	}
+
 	return &v2.Listener{
 		Name: listenerName,
 		Address: core.Address{
@@ -115,14 +161,12 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 				},
 			},
 		},
-		FilterChains: []listener.FilterChain{{
-			Filters: filters,
-		}},
+		FilterChains: []listener.FilterChain{filterChain},
 	}
 }
 
 // MakeHttpListener creates an Http listener for a cluster.
-func MakeHttpListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string) *v2.Listener {
+func MakeHttpListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string, cert tls.Certificate) *v2.Listener {
 	filters := []listener.Filter{}
 
 	rbacFilter, err := ipRbacFilter(sourceIPs)
@@ -158,6 +202,15 @@ func MakeHttpListener(listenerName string, port int32, clusterName string, sourc
 	// http filter should always go at the bottom of the chain
 	filters = append(filters, httpFilter)
 
+	filterChain := listener.FilterChain{
+		Filters: filters,
+	}
+
+	if cert.Cert != "" && cert.Key != "" {
+		tlsContext := MakeDownstreamTlsContect(cert)
+		filterChain.TlsContext = tlsContext
+	}
+
 	return &v2.Listener{
 		Name: listenerName,
 		Address: core.Address{
@@ -171,9 +224,7 @@ func MakeHttpListener(listenerName string, port int32, clusterName string, sourc
 				},
 			},
 		},
-		FilterChains: []listener.FilterChain{{
-			Filters: filters,
-		}},
+		FilterChains: []listener.FilterChain{filterChain},
 	}
 }
 
@@ -228,11 +279,11 @@ func endpoints(IPs []string, port int32) []endpoint.LbEndpoint {
 }
 
 // MakeCluster creates a cluster
-func MakeCluster(clusterName string, port int32, IPs []string) *v2.Cluster {
+func MakeCluster(clusterName string, port int32, IPs []string, cert tls.Certificate) *v2.Cluster {
 
 	endpoints := endpoints(IPs, port)
 
-	return &v2.Cluster{
+	cluster := &v2.Cluster{
 		Name:           clusterName,
 		ConnectTimeout: 5 * time.Second,
 		LoadAssignment: &v2.ClusterLoadAssignment{
@@ -243,14 +294,20 @@ func MakeCluster(clusterName string, port int32, IPs []string) *v2.Cluster {
 		},
 		HealthChecks: []*core.HealthCheck{},
 	}
+
+	if cert.Cert != "" && cert.Key != "" {
+		tlsContext := MakeUpstreamTlsContect(cert)
+		cluster.TlsContext = tlsContext
+	}
+	return cluster
 }
 
-// MakeCluster creates a cluster
-func MakeHttp2Cluster(clusterName string, port int32, IPs []string) *v2.Cluster {
+// MakeHttp2Cluster creates an http cluster
+func MakeHttp2Cluster(clusterName string, port int32, IPs []string, cert tls.Certificate) *v2.Cluster {
 
 	endpoints := endpoints(IPs, port)
 
-	return &v2.Cluster{
+	cluster := &v2.Cluster{
 		Name:           clusterName,
 		ConnectTimeout: 5 * time.Second,
 		LoadAssignment: &v2.ClusterLoadAssignment{
@@ -262,6 +319,12 @@ func MakeHttp2Cluster(clusterName string, port int32, IPs []string) *v2.Cluster 
 		Http2ProtocolOptions: &core.Http2ProtocolOptions{},
 		HealthChecks:         []*core.HealthCheck{},
 	}
+
+	if cert.Cert != "" && cert.Key != "" {
+		tlsContext := MakeUpstreamTlsContect(cert)
+		cluster.TlsContext = tlsContext
+	}
+	return cluster
 }
 
 func MessageToStruct(msg proto.Message) *types.Struct {

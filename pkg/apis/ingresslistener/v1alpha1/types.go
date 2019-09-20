@@ -25,15 +25,25 @@ type IngressListener struct {
 	Spec IngressListenerSpec `json:"spec"`
 }
 
+type RBAC struct {
+	Cluster string `json:"cluster"`
+	SNIs    string `jsnon:"snis"`
+}
+
+type TLS struct {
+	Secret string `json:"secret"`
+}
+
 // IngressListenerSpec is the spec for a MyResource resource
 type IngressListenerSpec struct {
 	// Message and SomeValue are example custom spec fields
 	//
 	// this is where you would put your custom resource data
-	NodeName         string `json:"nodename"`
-	ListenPort       *int32 `json:"listenport"`
-	TargetPort       *int32 `json:"targetport"`
-	RbacAllowCluster string `json:"rbacallowcluster"`
+	NodeName   string `json:"nodename"`
+	ListenPort int32  `json:"listenport"`
+	TargetPort int32  `json:"targetport"`
+	Rbac       RBAC   `json:"rbac"`
+	Tls        TLS    `json:"tls"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

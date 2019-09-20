@@ -17,11 +17,13 @@ import (
 
 type EgressListener struct {
 	Name          string
+	Namespace     string
 	NodeName      string
 	ListenPort    int32
 	TargetPort    int32
 	TargetCluster string
 	LbPolicy      string
+	TlsSecretName string
 }
 
 type egressListenerEventHandlerFunc func(eventType watch.EventType, old *egresslistener_v1alpha1.EgressListener, new *egresslistener_v1alpha1.EgressListener)
@@ -86,14 +88,16 @@ func (ils *EgressListenerStore) Init() {
 	ils.store = make(map[string]*EgressListener)
 }
 
-func (ils *EgressListenerStore) CreateOrUpdate(listenerName, nodeName, targetCluster, lbpolicy string, listenPort, targetPort int32) {
+func (ils *EgressListenerStore) CreateOrUpdate(listenerName, namespace, nodeName, targetCluster, lbpolicy string, listenPort, targetPort int32, tlsSecretName string) {
 	ils.store[listenerName] = &EgressListener{
 		Name:          listenerName,
+		Namespace:     namespace,
 		NodeName:      nodeName,
 		ListenPort:    listenPort,
 		TargetPort:    targetPort,
 		TargetCluster: targetCluster,
 		LbPolicy:      lbpolicy,
+		TlsSecretName: tlsSecretName,
 	}
 }
 

@@ -30,15 +30,15 @@ func TestEgressListenerListReturnsWithOneObject(t *testing.T) {
 	el.Start()
 
 	// Add a listener
-	listenPort := int32(8080)
-	targetPort := int32(8081)
 	el.handler(watch.Added, &egresslistener_v1alpha1.EgressListener{}, &egresslistener_v1alpha1.EgressListener{
 		Spec: egresslistener_v1alpha1.EgressListenerSpec{
-			NodeName:      "foobar",
-			ListenPort:    &listenPort,
-			TargetPort:    &targetPort,
-			TargetCluster: "test-cluster",
-			LbPolicy:      "policy",
+			NodeName:   "foobar",
+			ListenPort: int32(8080),
+			Target: egresslistener_v1alpha1.Target{
+				Port:    int32(8081),
+				Cluster: "test-cluster",
+			},
+			LbPolicy: "policy",
 		},
 	})
 
@@ -57,23 +57,21 @@ func TestEgressListenerListReturnsFromMultipleWatchers(t *testing.T) {
 	el.Start()
 
 	// Create a new event on each watcher
-	listenPort := int32(8080)
-	targetPort := int32(8081)
-	i := 0
-	for _, watcher := range el.egressListenerWatchers {
+	for i, watcher := range el.egressListenerWatchers {
 		new := &egresslistener_v1alpha1.EgressListener{
 			Spec: egresslistener_v1alpha1.EgressListenerSpec{
-				NodeName:      "foobar" + string(i),
-				ListenPort:    &listenPort,
-				TargetPort:    &targetPort,
-				TargetCluster: "test-cluster",
-				LbPolicy:      "policy",
+				NodeName:   "foobar" + string(i),
+				ListenPort: int32(8080),
+				Target: egresslistener_v1alpha1.Target{
+					Port:    int32(8081),
+					Cluster: "test-cluster",
+				},
+				LbPolicy: "policy",
 			},
 		}
 		new.Name = "foobar" + string(i)
 
 		watcher.eventHandler(watch.Added, &egresslistener_v1alpha1.EgressListener{}, new)
-		i++
 	}
 
 	egressListeners := el.List()
@@ -89,15 +87,15 @@ func TestEgressListenerListDoesntReturnDeletedObject(t *testing.T) {
 	el.Start()
 
 	// Add a listener
-	listenPort := int32(8080)
-	targetPort := int32(8081)
 	l := &egresslistener_v1alpha1.EgressListener{
 		Spec: egresslistener_v1alpha1.EgressListenerSpec{
-			NodeName:      "foobar",
-			ListenPort:    &listenPort,
-			TargetPort:    &targetPort,
-			TargetCluster: "test-cluster",
-			LbPolicy:      "policy",
+			NodeName:   "foobar",
+			ListenPort: int32(8080),
+			Target: egresslistener_v1alpha1.Target{
+				Port:    int32(8081),
+				Cluster: "test-cluster",
+			},
+			LbPolicy: "policy",
 		},
 	}
 	l.Name = "foobar"
@@ -119,22 +117,22 @@ func TestEgressListenerListReturnsUpdatedObject(t *testing.T) {
 	el.Start()
 
 	// Add a listener
-	listenPort := int32(8080)
-	targetPort := int32(8081)
 	l := &egresslistener_v1alpha1.EgressListener{
 		Spec: egresslistener_v1alpha1.EgressListenerSpec{
-			NodeName:      "foobar",
-			ListenPort:    &listenPort,
-			TargetPort:    &targetPort,
-			TargetCluster: "test-cluster",
-			LbPolicy:      "policy",
+			NodeName:   "foobar",
+			ListenPort: int32(8080),
+			Target: egresslistener_v1alpha1.Target{
+				Port:    int32(8081),
+				Cluster: "test-cluster",
+			},
+			LbPolicy: "policy",
 		},
 	}
 	l.Name = "foobar"
 	el.handler(watch.Added, &egresslistener_v1alpha1.EgressListener{}, l)
 
 	// Update the listener
-	l.Spec.TargetCluster = "different-cluster"
+	l.Spec.Target.Cluster = "different-cluster"
 	el.handler(watch.Modified, &egresslistener_v1alpha1.EgressListener{}, l)
 
 	egressListeners := el.List()
