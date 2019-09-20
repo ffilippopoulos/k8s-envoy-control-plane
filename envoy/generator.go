@@ -70,7 +70,7 @@ func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
 	return listener.Filter{}, errors.New("Requested rbac for empty sources list")
 }
 
-func MakeDownstreamTlsContect(cert tls.Certificate) *auth.DownstreamTlsContext {
+func MakeDownstreamTlsContext(cert tls.Certificate) *auth.DownstreamTlsContext {
 	tlsContext := &auth.DownstreamTlsContext{}
 	tlsContext.CommonTlsContext = &auth.CommonTlsContext{
 		TlsCertificates: []*auth.TlsCertificate{
@@ -144,7 +144,7 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 	}
 
 	if cert.Cert != "" && cert.Key != "" {
-		tlsContext := MakeDownstreamTlsContect(cert)
+		tlsContext := MakeDownstreamTlsContext(cert)
 		filterChain.TlsContext = tlsContext
 	}
 
@@ -207,7 +207,7 @@ func MakeHttpListener(listenerName string, port int32, clusterName string, sourc
 	}
 
 	if cert.Cert != "" && cert.Key != "" {
-		tlsContext := MakeDownstreamTlsContect(cert)
+		tlsContext := MakeDownstreamTlsContext(cert)
 		filterChain.TlsContext = tlsContext
 	}
 
