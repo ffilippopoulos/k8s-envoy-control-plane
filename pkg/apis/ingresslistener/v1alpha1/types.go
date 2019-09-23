@@ -26,8 +26,8 @@ type IngressListener struct {
 }
 
 type RBAC struct {
-	Cluster string `json:"cluster"`
-	SNIs    string `jsnon:"snis"`
+	Cluster string   `json:"cluster"`
+	SNIs    []string `jsnon:"snis"`
 }
 
 type TLS struct {

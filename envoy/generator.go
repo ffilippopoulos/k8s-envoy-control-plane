@@ -15,6 +15,7 @@ import (
 	rbac_filter "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/rbac/v2"
 	tcp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
 	rbac "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v2"
+	"github.com/envoyproxy/go-control-plane/envoy/type/matcher"
 	"github.com/envoyproxy/go-control-plane/pkg/util"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
@@ -26,6 +27,7 @@ func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
 
 	if len(sourceIPs) > 0 {
 		// One principal per ip address
+		// principals list work on OR policy
 		principals := []*rbac.Principal{}
 		for _, ip := range sourceIPs {
 			sourceIP := &core.CidrRange{
@@ -52,10 +54,64 @@ func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
 		}
 
 		rbac := &rbac_filter.RBAC{
-			StatPrefix: "rbac_ingress",
+			StatPrefix: "rbac_ip_ingress",
 			Rules: &rbac.RBAC{
 				Action:   rbac.RBAC_ALLOW,
 				Policies: map[string]*rbac.Policy{"source_ips": policy},
+			},
+		}
+
+		return listener.Filter{
+			Name: "envoy.filters.network.rbac",
+			ConfigType: &listener.Filter_Config{
+				Config: MessageToStruct(rbac),
+			},
+		}, nil
+	}
+
+	return listener.Filter{}, errors.New("Requested rbac for empty sources list")
+}
+
+func sniRbacFilter(snis []string) (listener.Filter, error) {
+
+	if len(snis) > 0 {
+		// One exact match principal per sni
+		// principals list work on OR policy
+		principals := []*rbac.Principal{}
+		for _, sni := range snis {
+			pattern := &matcher.StringMatcher_Exact{
+				Exact: sni,
+			}
+			matchSNI := &matcher.StringMatcher{
+				MatchPattern: pattern,
+			}
+
+			principals = append(principals, &rbac.Principal{
+				Identifier: &rbac.Principal_Authenticated_{
+					&rbac.Principal_Authenticated{
+						PrincipalName: matchSNI,
+					},
+				},
+			})
+		}
+
+		permission := &rbac.Permission{
+			Rule: &rbac.Permission_Any{
+				Any: true,
+			},
+		}
+
+		// Sum them in one policy
+		policy := &rbac.Policy{
+			Permissions: []*rbac.Permission{permission},
+			Principals:  principals,
+		}
+
+		rbac := &rbac_filter.RBAC{
+			StatPrefix: "rbac_auth_ingress",
+			Rules: &rbac.RBAC{
+				Action:   rbac.RBAC_ALLOW,
+				Policies: map[string]*rbac.Policy{"source_snis": policy},
 			},
 		}
 
@@ -105,17 +161,27 @@ func MakeUpstreamTlsContect(cert tls.Certificate) *auth.UpstreamTlsContext {
 }
 
 // MakeTCPListener creates a TCP listener for a cluster.
-func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string, cert tls.Certificate) *v2.Listener {
+func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs, sourceSNIs []string, listenAddress string, cert tls.Certificate) *v2.Listener {
 
 	filters := []listener.Filter{}
 
-	rbacFilter, err := ipRbacFilter(sourceIPs)
-	if err != nil {
+	if len(sourceIPs) > 0 {
+		rbacFilter, err := ipRbacFilter(sourceIPs)
+		if err != nil {
 
-	} else {
-		filters = append(filters, rbacFilter)
+		} else {
+			filters = append(filters, rbacFilter)
+		}
 	}
 
+	if len(sourceSNIs) > 0 {
+		rbacFilter, err := sniRbacFilter(sourceSNIs)
+		if err != nil {
+
+		} else {
+			filters = append(filters, rbacFilter)
+		}
+	}
 	// tcp filter should always go at the bottom of the chain
 
 	// TCP filter configuration use by default
@@ -166,14 +232,25 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 }
 
 // MakeHttpListener creates an Http listener for a cluster.
-func MakeHttpListener(listenerName string, port int32, clusterName string, sourceIPs []string, listenAddress string, cert tls.Certificate) *v2.Listener {
+func MakeHttpListener(listenerName string, port int32, clusterName string, sourceIPs, sourceSNIs []string, listenAddress string, cert tls.Certificate) *v2.Listener {
 	filters := []listener.Filter{}
 
-	rbacFilter, err := ipRbacFilter(sourceIPs)
-	if err != nil {
+	if len(sourceIPs) > 0 {
+		rbacFilter, err := ipRbacFilter(sourceIPs)
+		if err != nil {
 
-	} else {
-		filters = append(filters, rbacFilter)
+		} else {
+			filters = append(filters, rbacFilter)
+		}
+	}
+
+	if len(sourceSNIs) > 0 {
+		rbacFilter, err := sniRbacFilter(sourceSNIs)
+		if err != nil {
+
+		} else {
+			filters = append(filters, rbacFilter)
+		}
 	}
 
 	manager := &hcm.HttpConnectionManager{

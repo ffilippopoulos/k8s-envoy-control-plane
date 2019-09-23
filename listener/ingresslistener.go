@@ -22,6 +22,7 @@ type IngressListener struct {
 	ListenPort       int32
 	TargetPort       int32
 	RbacAllowCluster string
+	RbacAllowSNIs    []string
 	TlsSecretName    string
 }
 
@@ -87,7 +88,7 @@ func (ils *IngressListenerStore) Init() {
 	ils.store = make(map[string]*IngressListener)
 }
 
-func (ils *IngressListenerStore) CreateOrUpdate(listenerName, namespace, nodeName, rbacAllowCluster, tlsSecretName string, listenPort, targetPort int32) {
+func (ils *IngressListenerStore) CreateOrUpdate(listenerName, namespace, nodeName, rbacAllowCluster string, rbacAllowSNIs []string, tlsSecretName string, listenPort, targetPort int32) {
 	ils.store[listenerName] = &IngressListener{
 		Name:             listenerName,
 		Namespace:        namespace,
@@ -95,6 +96,7 @@ func (ils *IngressListenerStore) CreateOrUpdate(listenerName, namespace, nodeNam
 		ListenPort:       listenPort,
 		TargetPort:       targetPort,
 		RbacAllowCluster: rbacAllowCluster,
+		RbacAllowSNIs:    rbacAllowSNIs,
 		TlsSecretName:    tlsSecretName,
 	}
 }

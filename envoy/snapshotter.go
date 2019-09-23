@@ -84,6 +84,9 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 					rbacClusterIPs = rbacCluster.GetIPs()
 				}
 
+				rbacSNIs := ingressListener.RbacAllowSNIs
+				log.Printf("[DEBUG] snis list %v", rbacSNIs)
+
 				// Generate a local cluster
 				// TODO: that looks to override clusters in case of more than 1 local listeners, let's add the port name
 				clusterName := "ingress_" + ingressListener.Name + "_cluster"
@@ -102,7 +105,7 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				}
 
 				// Generate a listener to forward traffic to the cluster
-				l := MakeTCPListener("ingress_"+ingressListener.Name, ingressListener.ListenPort, clusterName, rbacClusterIPs, "0.0.0.0", cert)
+				l := MakeTCPListener("ingress_"+ingressListener.Name, ingressListener.ListenPort, clusterName, rbacClusterIPs, rbacSNIs, "0.0.0.0", cert)
 
 				// Append to the list
 				clusters = append(clusters, c)
@@ -144,7 +147,7 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 					clusters = append(clusters, c)
 
 					// Generate a listener to forward traffic to the cluster
-					l := MakeHttpListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, "127.0.0.1", cert)
+					l := MakeHttpListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, []string{}, "127.0.0.1", cert)
 					listeners = append(listeners, l)
 
 				} else {
@@ -152,7 +155,7 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 					clusters = append(clusters, c)
 
 					// Generate a listener to forward traffic to the cluster
-					l := MakeTCPListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, "127.0.0.1", tls.Certificate{})
+					l := MakeTCPListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, []string{}, "127.0.0.1", tls.Certificate{})
 					listeners = append(listeners, l)
 				}
 			}
