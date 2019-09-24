@@ -27,11 +27,12 @@ type IngressListener struct {
 
 type RBAC struct {
 	Cluster string   `json:"cluster"`
-	SNIs    []string `jsnon:"snis"`
+	Sans    []string `jsnon:"sans"`
 }
 
 type TLS struct {
-	Secret string `json:"secret"`
+	Secret     string `json:"secret"`
+	Validation string `json:"validation"`
 }
 
 // IngressListenerSpec is the spec for a MyResource resource
@@ -44,6 +45,7 @@ type IngressListenerSpec struct {
 	TargetPort int32  `json:"targetport"`
 	Rbac       RBAC   `json:"rbac"`
 	Tls        TLS    `json:"tls"`
+	Layer      string `json:"layer"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

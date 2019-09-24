@@ -84,13 +84,11 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 					rbacClusterIPs = rbacCluster.GetIPs()
 				}
 
-				rbacSNIs := ingressListener.RbacAllowSNIs
-				log.Printf("[DEBUG] snis list %v", rbacSNIs)
+				rbacSANs := ingressListener.RbacAllowSANs
 
 				// Generate a local cluster
 				// TODO: that looks to override clusters in case of more than 1 local listeners, let's add the port name
 				clusterName := "ingress_" + ingressListener.Name + "_cluster"
-				c := MakeCluster(clusterName, ingressListener.TargetPort, []string{"127.0.0.1"}, tls.Certificate{})
 
 				// Get tls from tls context
 				cert := tls.Certificate{}
@@ -98,18 +96,40 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 					log.Printf("[DEBUG] looking for secret: %s", ingressListener.TlsSecretName)
 					cert, err = tls.GetTLS(ingressListener.Namespace, ingressListener.TlsSecretName)
 					if err != nil {
-						log.Printf("[ERROR] Can't get tls context forsecret: %s in namespace %s:%v, skipping ingress listener %s",
+						log.Printf("[ERROR] Can't get tls context for secret: %s in namespace %s:%v, skipping ingress listener %s",
 							ingressListener.Namespace, ingressListener.TlsSecretName, err, ingressListener.Name)
 						continue
 					}
 				}
 
-				// Generate a listener to forward traffic to the cluster
-				l := MakeTCPListener("ingress_"+ingressListener.Name, ingressListener.ListenPort, clusterName, rbacClusterIPs, rbacSNIs, "0.0.0.0", cert)
+				var ca string
+				if ingressListener.CaValidationSecret != "" {
+					log.Printf("[DEBUG] looking for secret: %s", ingressListener.CaValidationSecret)
+					ca, err = tls.GetCA(ingressListener.Namespace, ingressListener.CaValidationSecret)
+					if err != nil {
+						log.Printf("[ERROR] Can't get ca from secret: %s in namespace %s:%v, skipping ingress listener %s",
+							ingressListener.Namespace, ingressListener.CaValidationSecret, err, ingressListener.Name)
+						continue
+					}
+				}
 
-				// Append to the list
-				clusters = append(clusters, c)
-				listeners = append(listeners, l)
+				if ingressListener.Layer == "http" {
+
+					c := MakeHttp2Cluster(clusterName, ingressListener.TargetPort, []string{"127.0.0.1"}, tls.Certificate{})
+					clusters = append(clusters, c)
+
+					// Generate a listener to forward traffic to the cluster
+					l := MakeHttpListener("ingress_"+ingressListener.Name, ingressListener.ListenPort, clusterName, rbacClusterIPs, rbacSANs, "0.0.0.0", cert, ca)
+					listeners = append(listeners, l)
+
+				} else {
+					c := MakeCluster(clusterName, ingressListener.TargetPort, []string{"127.0.0.1"}, tls.Certificate{})
+					clusters = append(clusters, c)
+
+					// Generate a listener to forward traffic to the cluster
+					l := MakeTCPListener("ingress_"+ingressListener.Name, ingressListener.ListenPort, clusterName, rbacClusterIPs, rbacSANs, "0.0.0.0", cert, ca)
+					listeners = append(listeners, l)
+				}
 
 			}
 		}
@@ -147,7 +167,7 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 					clusters = append(clusters, c)
 
 					// Generate a listener to forward traffic to the cluster
-					l := MakeHttpListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, []string{}, "127.0.0.1", cert)
+					l := MakeHttpListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, []string{}, "127.0.0.1", tls.Certificate{}, "")
 					listeners = append(listeners, l)
 
 				} else {
@@ -155,7 +175,7 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 					clusters = append(clusters, c)
 
 					// Generate a listener to forward traffic to the cluster
-					l := MakeTCPListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, []string{}, "127.0.0.1", tls.Certificate{})
+					l := MakeTCPListener("egress_"+egressListener.Name, egressListener.ListenPort, clusterName, []string{"127.0.0.1"}, []string{}, "127.0.0.1", tls.Certificate{}, "")
 					listeners = append(listeners, l)
 				}
 			}

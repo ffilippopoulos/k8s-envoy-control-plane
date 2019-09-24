@@ -72,24 +72,24 @@ func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
 	return listener.Filter{}, errors.New("Requested rbac for empty sources list")
 }
 
-func sniRbacFilter(snis []string) (listener.Filter, error) {
+func sanRbacFilter(sans []string) (listener.Filter, error) {
 
-	if len(snis) > 0 {
-		// One exact match principal per sni
+	if len(sans) > 0 {
+		// One exact match principal per san
 		// principals list work on OR policy
 		principals := []*rbac.Principal{}
-		for _, sni := range snis {
+		for _, san := range sans {
 			pattern := &matcher.StringMatcher_Exact{
-				Exact: sni,
+				Exact: san,
 			}
-			matchSNI := &matcher.StringMatcher{
+			matchSAN := &matcher.StringMatcher{
 				MatchPattern: pattern,
 			}
 
 			principals = append(principals, &rbac.Principal{
 				Identifier: &rbac.Principal_Authenticated_{
 					&rbac.Principal_Authenticated{
-						PrincipalName: matchSNI,
+						PrincipalName: matchSAN,
 					},
 				},
 			})
@@ -111,7 +111,7 @@ func sniRbacFilter(snis []string) (listener.Filter, error) {
 			StatPrefix: "rbac_auth_ingress",
 			Rules: &rbac.RBAC{
 				Action:   rbac.RBAC_ALLOW,
-				Policies: map[string]*rbac.Policy{"source_snis": policy},
+				Policies: map[string]*rbac.Policy{"source_sans": policy},
 			},
 		}
 
@@ -126,7 +126,7 @@ func sniRbacFilter(snis []string) (listener.Filter, error) {
 	return listener.Filter{}, errors.New("Requested rbac for empty sources list")
 }
 
-func MakeDownstreamTlsContext(cert tls.Certificate) *auth.DownstreamTlsContext {
+func MakeDownstreamTlsContext(cert tls.Certificate, ca string) *auth.DownstreamTlsContext {
 	tlsContext := &auth.DownstreamTlsContext{}
 	tlsContext.CommonTlsContext = &auth.CommonTlsContext{
 		TlsCertificates: []*auth.TlsCertificate{
@@ -139,6 +139,15 @@ func MakeDownstreamTlsContext(cert tls.Certificate) *auth.DownstreamTlsContext {
 				},
 			},
 		},
+	}
+	if ca != "" {
+		tlsContext.CommonTlsContext.ValidationContextType = &auth.CommonTlsContext_ValidationContext{
+			ValidationContext: &auth.CertificateValidationContext{
+				TrustedCa: &core.DataSource{
+					Specifier: &core.DataSource_InlineString{InlineString: ca},
+				},
+			},
+		}
 	}
 	return tlsContext
 }
@@ -161,7 +170,7 @@ func MakeUpstreamTlsContect(cert tls.Certificate) *auth.UpstreamTlsContext {
 }
 
 // MakeTCPListener creates a TCP listener for a cluster.
-func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs, sourceSNIs []string, listenAddress string, cert tls.Certificate) *v2.Listener {
+func MakeTCPListener(listenerName string, port int32, clusterName string, sourceIPs, sourceSANs []string, listenAddress string, cert tls.Certificate, ca string) *v2.Listener {
 
 	filters := []listener.Filter{}
 
@@ -174,8 +183,8 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 		}
 	}
 
-	if len(sourceSNIs) > 0 {
-		rbacFilter, err := sniRbacFilter(sourceSNIs)
+	if len(sourceSANs) > 0 {
+		rbacFilter, err := sanRbacFilter(sourceSANs)
 		if err != nil {
 
 		} else {
@@ -210,7 +219,7 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 	}
 
 	if cert.Cert != "" && cert.Key != "" {
-		tlsContext := MakeDownstreamTlsContext(cert)
+		tlsContext := MakeDownstreamTlsContext(cert, ca)
 		filterChain.TlsContext = tlsContext
 	}
 
@@ -232,7 +241,7 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 }
 
 // MakeHttpListener creates an Http listener for a cluster.
-func MakeHttpListener(listenerName string, port int32, clusterName string, sourceIPs, sourceSNIs []string, listenAddress string, cert tls.Certificate) *v2.Listener {
+func MakeHttpListener(listenerName string, port int32, clusterName string, sourceIPs, sourceSANs []string, listenAddress string, cert tls.Certificate, ca string) *v2.Listener {
 	filters := []listener.Filter{}
 
 	if len(sourceIPs) > 0 {
@@ -244,8 +253,8 @@ func MakeHttpListener(listenerName string, port int32, clusterName string, sourc
 		}
 	}
 
-	if len(sourceSNIs) > 0 {
-		rbacFilter, err := sniRbacFilter(sourceSNIs)
+	if len(sourceSANs) > 0 {
+		rbacFilter, err := sanRbacFilter(sourceSANs)
 		if err != nil {
 
 		} else {
@@ -284,7 +293,8 @@ func MakeHttpListener(listenerName string, port int32, clusterName string, sourc
 	}
 
 	if cert.Cert != "" && cert.Key != "" {
-		tlsContext := MakeDownstreamTlsContext(cert)
+		tlsContext := MakeDownstreamTlsContext(cert, ca)
+		tlsContext.CommonTlsContext.AlpnProtocols = []string{"h2", "http/1.1"}
 		filterChain.TlsContext = tlsContext
 	}
 
@@ -399,6 +409,7 @@ func MakeHttp2Cluster(clusterName string, port int32, IPs []string, cert tls.Cer
 
 	if cert.Cert != "" && cert.Key != "" {
 		tlsContext := MakeUpstreamTlsContect(cert)
+		tlsContext.CommonTlsContext.AlpnProtocols = []string{"h2", "http/1.1"}
 		cluster.TlsContext = tlsContext
 	}
 	return cluster

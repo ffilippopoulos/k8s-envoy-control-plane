@@ -63,3 +63,36 @@ func getCertificateBlocks(secret *corev1.Secret) (string, string, error) {
 
 	return cert, key, nil
 }
+
+func GetCA(namespace, secretName string) (string, error) {
+	if secretName == "" {
+		log.Println("[WARN] no secret name provided")
+		return "", errors.New("secret name empty")
+	}
+
+	secret, err := k8sClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("failed to fetch secret %s/%s: %v", namespace, secretName, err))
+	}
+
+	ca, err := getCAFromSecret(secret)
+	if err != nil {
+		return ca, errors.New(fmt.Sprintf("failed to get ca.crt for secret: %s/%s: %v", namespace, secretName, err))
+	}
+
+	return ca, nil
+}
+
+func getCAFromSecret(secret *corev1.Secret) (string, error) {
+	caData, caExists := secret.Data["ca.crt"]
+	if !caExists {
+		return "", errors.New("missing entry: ca.crt")
+	}
+
+	ca := string(caData)
+	if ca == "" {
+		return "", errors.New("ca.crt is empty")
+	}
+
+	return ca, nil
+}

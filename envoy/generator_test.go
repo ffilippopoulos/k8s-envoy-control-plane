@@ -69,25 +69,25 @@ func TestIpRbacFilter(t *testing.T) {
 	assert.Equal(t, "10.2.0.2", address_prefix.Kind.(*types.Value_StringValue).StringValue)
 }
 
-func TestSniRbacFilter(t *testing.T) {
+func TestSanRbacFilter(t *testing.T) {
 
 	// Test calling with empty list
-	sourceSNIs := []string{}
+	sourceSANs := []string{}
 
-	_, err := sniRbacFilter(sourceSNIs)
+	_, err := sanRbacFilter(sourceSANs)
 	expectedErr := errors.New("Requested rbac for empty sources list")
 
 	if assert.Error(t, err) {
 		assert.Equal(t, expectedErr, err)
 	}
 
-	// Test calling with single sni list
-	sourceSNIs = []string{
+	// Test calling with single san list
+	sourceSANs = []string{
 		"test.io/bob",
 	}
-	rbacFilter, err := sniRbacFilter(sourceSNIs)
+	rbacFilter, err := sanRbacFilter(sourceSANs)
 	if err != nil {
-		t.Fatalf("error creating sni rbac filte: %v", err)
+		t.Fatalf("error creating san rbac filte: %v", err)
 	}
 
 	// Verify that we got 1 policy and 1 principal with that ip
@@ -95,21 +95,21 @@ func TestSniRbacFilter(t *testing.T) {
 	conf := rbacFilter.ConfigType.(*listener.Filter_Config).Config
 	rules := conf.Fields["rules"]
 	policies := rules.Kind.(*types.Value_StructValue).StructValue.Fields["policies"]
-	source_snis := policies.Kind.(*types.Value_StructValue).StructValue.Fields["source_snis"]
-	principals := source_snis.Kind.(*types.Value_StructValue).StructValue.Fields["principals"]
+	source_sans := policies.Kind.(*types.Value_StructValue).StructValue.Fields["source_sans"]
+	principals := source_sans.Kind.(*types.Value_StructValue).StructValue.Fields["principals"]
 	principalsList := principals.Kind.(*types.Value_ListValue).ListValue.Values
 	assert.Equal(t, 1, len(principalsList))
 	authenticated := principalsList[0].Kind.(*types.Value_StructValue).StructValue.Fields["authenticated"].Kind.(*types.Value_StructValue).StructValue.Fields["principal_name"]
 	assert.Equal(t, "test.io/bob", authenticated.Kind.(*types.Value_StructValue).StructValue.Fields["exact"].Kind.(*types.Value_StringValue).StringValue)
 
-	// Test calling with multiple snis list
-	sourceSNIs = []string{
+	// Test calling with multiple sans list
+	sourceSANs = []string{
 		"test.io/bob",
 		"test.io/alice",
 	}
-	rbacFilter, err = sniRbacFilter(sourceSNIs)
+	rbacFilter, err = sanRbacFilter(sourceSANs)
 	if err != nil {
-		t.Fatalf("error creating sni rbac filte: %v", err)
+		t.Fatalf("error creating san rbac filter: %v", err)
 	}
 
 	// Verify that we got 1 policy and 1 principal with that ip
@@ -117,8 +117,8 @@ func TestSniRbacFilter(t *testing.T) {
 	conf = rbacFilter.ConfigType.(*listener.Filter_Config).Config
 	rules = conf.Fields["rules"]
 	policies = rules.Kind.(*types.Value_StructValue).StructValue.Fields["policies"]
-	source_snis = policies.Kind.(*types.Value_StructValue).StructValue.Fields["source_snis"]
-	principals = source_snis.Kind.(*types.Value_StructValue).StructValue.Fields["principals"]
+	source_sans = policies.Kind.(*types.Value_StructValue).StructValue.Fields["source_sans"]
+	principals = source_sans.Kind.(*types.Value_StructValue).StructValue.Fields["principals"]
 	principalsList = principals.Kind.(*types.Value_ListValue).ListValue.Values
 	assert.Equal(t, 2, len(principalsList))
 	authenticated = principalsList[0].Kind.(*types.Value_StructValue).StructValue.Fields["authenticated"].Kind.(*types.Value_StructValue).StructValue.Fields["principal_name"]

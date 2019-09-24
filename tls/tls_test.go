@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestEmptySecretName(t *testing.T) {
+func TestEmptyTLSSecretName(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	Init(client)
 
@@ -24,7 +24,7 @@ func TestEmptySecretName(t *testing.T) {
 	}
 }
 
-func TestNoSecretFound(t *testing.T) {
+func TestNoTLSSecretFound(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	Init(client)
 
@@ -37,7 +37,7 @@ func TestNoSecretFound(t *testing.T) {
 	}
 }
 
-func TestSecretEmpty(t *testing.T) {
+func TestTLSSecretEmpty(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	s := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,7 +61,7 @@ func TestSecretEmpty(t *testing.T) {
 	}
 }
 
-func TestSecretKeyMissing(t *testing.T) {
+func TestTLSSecretKeyMissing(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	data := make(map[string][]byte)
 	data["tls.crt"] = []byte("AAAAAAAAAAAAAAA=")
@@ -88,7 +88,7 @@ func TestSecretKeyMissing(t *testing.T) {
 	}
 }
 
-func TestSecretCertEmpty(t *testing.T) {
+func TestTLSSecretCertEmpty(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	data := make(map[string][]byte)
 	data["tls.crt"] = []byte{}
@@ -116,7 +116,7 @@ func TestSecretCertEmpty(t *testing.T) {
 	}
 }
 
-func TestSecretKeyEmpty(t *testing.T) {
+func TestTLSSecretKeyEmpty(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	data := make(map[string][]byte)
 	data["tls.crt"] = []byte("AAAAAAAAAAAAAAA=")
@@ -172,4 +172,110 @@ func TestGetTLS(t *testing.T) {
 		Key:  "AAAAAAAAAAAAAAA=",
 	}
 	assert.Equal(t, expectedCert, cert)
+}
+
+func TestEmptyCASecretName(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	Init(client)
+
+	_, err := GetCA("namespace", "")
+
+	expectedError := errors.New("secret name empty")
+
+	if assert.Error(t, err) {
+		assert.Equal(t, expectedError, err)
+	}
+}
+
+func TestNoCASecretFound(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	Init(client)
+
+	_, err := GetCA("namespace", "secret")
+
+	expectedError := errors.New(fmt.Sprintf("failed to fetch secret %s/%s: secrets \"%s\" not found", "namespace", "secret", "secret"))
+
+	if assert.Error(t, err) {
+		assert.Equal(t, expectedError, err)
+	}
+}
+
+func TestCAKeyMissing(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	data := make(map[string][]byte)
+	data["blah.crt"] = []byte("AAAAAAAAAAAAAAA=")
+	s := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret",
+			Namespace: "namespace",
+		},
+		Data: data,
+	}
+	_, err := client.CoreV1().Secrets("namespace").Create(&s)
+	if err != nil {
+		t.Fatalf("error creating secret %v: %v", s, err)
+	}
+	Init(client)
+
+	_, err = GetCA("namespace", "secret")
+
+	errCrtMissing := errors.New("missing entry: ca.crt")
+	expectedError := errors.New(fmt.Sprintf("failed to get ca.crt for secret: %s/%s: %v", "namespace", "secret", errCrtMissing))
+
+	if assert.Error(t, err) {
+		assert.Equal(t, expectedError, err)
+	}
+}
+
+func TestCASecretEmpty(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	data := make(map[string][]byte)
+	data["ca.crt"] = []byte{}
+	s := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret",
+			Namespace: "namespace",
+		},
+		Data: data,
+	}
+	_, err := client.CoreV1().Secrets("namespace").Create(&s)
+	if err != nil {
+		t.Fatalf("error creating secret %v: %v", s, err)
+	}
+	Init(client)
+
+	_, err = GetCA("namespace", "secret")
+
+	errCrtMissing := errors.New("ca.crt is empty")
+	expectedError := errors.New(fmt.Sprintf("failed to get ca.crt for secret: %s/%s: %v", "namespace", "secret", errCrtMissing))
+
+	if assert.Error(t, err) {
+		assert.Equal(t, expectedError, err)
+	}
+}
+
+func TestGetCA(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	data := make(map[string][]byte)
+	data["ca.crt"] = []byte("AAAAAAAAAAAAAAA=")
+	s := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret",
+			Namespace: "namespace",
+		},
+		Data: data,
+	}
+	_, err := client.CoreV1().Secrets("namespace").Create(&s)
+	if err != nil {
+		t.Fatalf("error creating secret %v: %v", s, err)
+	}
+	Init(client)
+
+	ca, err := GetCA("namespace", "secret")
+	if err != nil {
+		t.Fatalf("error getting tls %v", err)
+	}
+
+	expectedCA := "AAAAAAAAAAAAAAA="
+	assert.Equal(t, expectedCA, ca)
 }
