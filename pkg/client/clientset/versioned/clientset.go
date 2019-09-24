@@ -29,7 +29,11 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	EgresslistenerV1alpha1() egresslistenerv1alpha1.EgresslistenerV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Egresslistener() egresslistenerv1alpha1.EgresslistenerV1alpha1Interface
 	IngresslistenerV1alpha1() ingresslistenerv1alpha1.IngresslistenerV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Ingresslistener() ingresslistenerv1alpha1.IngresslistenerV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -45,8 +49,20 @@ func (c *Clientset) EgresslistenerV1alpha1() egresslistenerv1alpha1.Egresslisten
 	return c.egresslistenerV1alpha1
 }
 
+// Deprecated: Egresslistener retrieves the default version of EgresslistenerClient.
+// Please explicitly pick a version.
+func (c *Clientset) Egresslistener() egresslistenerv1alpha1.EgresslistenerV1alpha1Interface {
+	return c.egresslistenerV1alpha1
+}
+
 // IngresslistenerV1alpha1 retrieves the IngresslistenerV1alpha1Client
 func (c *Clientset) IngresslistenerV1alpha1() ingresslistenerv1alpha1.IngresslistenerV1alpha1Interface {
+	return c.ingresslistenerV1alpha1
+}
+
+// Deprecated: Ingresslistener retrieves the default version of IngresslistenerClient.
+// Please explicitly pick a version.
+func (c *Clientset) Ingresslistener() ingresslistenerv1alpha1.IngresslistenerV1alpha1Interface {
 	return c.ingresslistenerV1alpha1
 }
 

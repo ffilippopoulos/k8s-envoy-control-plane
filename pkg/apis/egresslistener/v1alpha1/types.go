@@ -25,16 +25,25 @@ type EgressListener struct {
 	Spec EgressListenerSpec `json:"spec"`
 }
 
+type Target struct {
+	Cluster string `json:"cluster"`
+	Port    int32  `json:"port"`
+}
+
+type TLS struct {
+	Secret string `json:"secret"`
+}
+
 // EgressListenerSpec is the spec for a MyResource resource
 type EgressListenerSpec struct {
 	// Message and SomeValue are example custom spec fields
 	//
 	// this is where you would put your custom resource data
-	NodeName      string `json:"nodename"`
-	ListenPort    *int32 `json:"listenport"`
-	TargetPort    *int32 `json:"targetport"`
-	TargetCluster string `json:"targetcluster"`
-	LbPolicy      string `json:"lbpolicy"`
+	NodeName   string `json:"nodename"`
+	ListenPort int32  `json:"listenport"`
+	Target     Target `json:"target"`
+	LbPolicy   string `json:"lbpolicy"`
+	Tls        TLS    `json:"tls"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

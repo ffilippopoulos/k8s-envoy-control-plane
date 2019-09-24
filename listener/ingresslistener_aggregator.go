@@ -42,15 +42,39 @@ func (sa *IngressListenerAggregator) Start() error {
 func (sa *IngressListenerAggregator) Handler(eventType watch.EventType, old *ingresslistener_v1alpha1.IngressListener, new *ingresslistener_v1alpha1.IngressListener) {
 	switch eventType {
 	case watch.Added:
-		log.Printf("[DEBUG] received %s event for ingress listener %s: 0.0.0.0:%d -> 127.0.0.1:%d", eventType, new.Name, *new.Spec.ListenPort, *new.Spec.TargetPort)
-		sa.ingressListenerStore.CreateOrUpdate(new.Name, new.Spec.NodeName, new.Spec.RbacAllowCluster, *new.Spec.ListenPort, *new.Spec.TargetPort)
+		log.Printf("[DEBUG] received %s event for ingress listener %s: 0.0.0.0:%d -> 127.0.0.1:%d", eventType, new.Name, new.Spec.ListenPort, new.Spec.TargetPort)
+		sa.ingressListenerStore.CreateOrUpdate(
+			new.Name,
+			new.Namespace,
+			new.Spec.NodeName,
+			new.Spec.Rbac.Cluster,
+			new.Spec.Rbac.Sans,
+			new.Spec.Tls.Secret,
+			new.Spec.Tls.Validation,
+			new.Spec.ListenPort,
+			new.Spec.TargetPort,
+			new.Spec.Layer,
+		)
 		sa.events <- new
 	case watch.Modified:
-		log.Printf("[DEBUG] received %s event for ingress listener %s: 0.0.0.0:%d -> 127.0.0.1:%d", eventType, new.Name, *new.Spec.ListenPort, *new.Spec.TargetPort)
-		sa.ingressListenerStore.CreateOrUpdate(new.Name, new.Spec.NodeName, new.Spec.RbacAllowCluster, *new.Spec.ListenPort, *new.Spec.TargetPort)
+		log.Printf("[DEBUG] received %s event for ingress listener %s: 0.0.0.0:%d -> 127.0.0.1:%d", eventType, new.Name, new.Spec.ListenPort, new.Spec.TargetPort)
+		log.Printf("[DEBUG] cluster %s", new.Spec.Rbac.Cluster)
+		log.Printf("[DEBUG] new: %v", new.Spec)
+		sa.ingressListenerStore.CreateOrUpdate(
+			new.Name,
+			new.Namespace,
+			new.Spec.NodeName,
+			new.Spec.Rbac.Cluster,
+			new.Spec.Rbac.Sans,
+			new.Spec.Tls.Secret,
+			new.Spec.Tls.Validation,
+			new.Spec.ListenPort,
+			new.Spec.TargetPort,
+			new.Spec.Layer,
+		)
 		sa.events <- new
 	case watch.Deleted:
-		log.Printf("[DEBUG] received %s event for ingress listener %s: 0.0.0.0:%d -> 127.0.0.1:%d", eventType, new.Name, *new.Spec.ListenPort, *new.Spec.TargetPort)
+		log.Printf("[DEBUG] received %s event for ingress listener %s: 0.0.0.0:%d -> 127.0.0.1:%d", eventType, new.Name, new.Spec.ListenPort, new.Spec.TargetPort)
 		sa.ingressListenerStore.Delete(old.Name)
 		sa.events <- old
 	default:

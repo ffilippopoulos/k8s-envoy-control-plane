@@ -20,6 +20,7 @@ import (
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/envoy"
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/listener"
 	custom_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
+	"github.com/ffilippopoulos/k8s-envoy-control-plane/tls"
 )
 
 var (
@@ -60,6 +61,7 @@ func main() {
 
 	clusterSources := []kubernetes.Interface{}
 	listenerSources := []custom_clientset.Interface{}
+	var tlsSource kubernetes.Interface
 
 	for _, s := range k8sSources {
 		client, err := cluster.GetClient(s.KubeConfig)
@@ -75,6 +77,9 @@ func main() {
 				log.Fatal(fmt.Sprintf("getting client for k8s cluster: %s failed", s.Name), err)
 			}
 			listenerSources = append(listenerSources, lClient)
+
+			// if we listen to that cluster it means that we could potentially seek tls secrets for listeners
+			tlsSource = client
 		}
 	}
 
@@ -86,6 +91,8 @@ func main() {
 
 	el := listener.NewEgressListenerAggregator(listenerSources)
 	el.Start()
+
+	tls.Init(tlsSource)
 
 	grpcServer := grpc.NewServer()
 	lis, err := net.Listen("tcp", ":18000")

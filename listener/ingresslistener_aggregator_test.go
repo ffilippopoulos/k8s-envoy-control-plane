@@ -30,14 +30,14 @@ func TestIngressListenerListReturnsWithOneObject(t *testing.T) {
 	il.Start()
 
 	// Add a listener
-	listenPort := int32(8080)
-	targetPort := int32(8081)
 	il.Handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, &ingresslistener_v1alpha1.IngressListener{
 		Spec: ingresslistener_v1alpha1.IngressListenerSpec{
-			NodeName:         "foobar",
-			ListenPort:       &listenPort,
-			TargetPort:       &targetPort,
-			RbacAllowCluster: "test-cluster",
+			NodeName:   "foobar",
+			ListenPort: int32(8080),
+			TargetPort: int32(8081),
+			Rbac: ingresslistener_v1alpha1.RBAC{
+				Cluster: "test-cluster",
+			},
 		},
 	})
 
@@ -56,22 +56,20 @@ func TestIngressListenerListReturnsFromMultipleWatchers(t *testing.T) {
 	il.Start()
 
 	// Create a new event on each watcher
-	listenPort := int32(8080)
-	targetPort := int32(8081)
-	i := 0
-	for _, watcher := range il.ingressListenerWatchers {
+	for i, watcher := range il.ingressListenerWatchers {
 		new := &ingresslistener_v1alpha1.IngressListener{
 			Spec: ingresslistener_v1alpha1.IngressListenerSpec{
-				NodeName:         "foobar" + string(i),
-				ListenPort:       &listenPort,
-				TargetPort:       &targetPort,
-				RbacAllowCluster: "test-cluster",
+				NodeName:   "foobar" + string(i),
+				ListenPort: int32(8080),
+				TargetPort: int32(8081),
+				Rbac: ingresslistener_v1alpha1.RBAC{
+					Cluster: "test-cluster",
+				},
 			},
 		}
 		new.Name = "foobar" + string(i)
 
 		watcher.eventHandler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, new)
-		i++
 	}
 
 	ingressListeners := il.List()
@@ -87,14 +85,14 @@ func TestIngressListenerListDoesntReturnDeletedObject(t *testing.T) {
 	il.Start()
 
 	// Add a listener
-	listenPort := int32(8080)
-	targetPort := int32(8081)
 	l := &ingresslistener_v1alpha1.IngressListener{
 		Spec: ingresslistener_v1alpha1.IngressListenerSpec{
-			NodeName:         "foobar",
-			ListenPort:       &listenPort,
-			TargetPort:       &targetPort,
-			RbacAllowCluster: "test-cluster",
+			NodeName:   "foobar",
+			ListenPort: int32(8080),
+			TargetPort: int32(8081),
+			Rbac: ingresslistener_v1alpha1.RBAC{
+				Cluster: "test-cluster",
+			},
 		},
 	}
 	l.Name = "foobar"
@@ -116,21 +114,21 @@ func TestIngressListenerListReturnsUpdatedObject(t *testing.T) {
 	il.Start()
 
 	// Add a listener
-	listenPort := int32(8080)
-	targetPort := int32(8081)
 	l := &ingresslistener_v1alpha1.IngressListener{
 		Spec: ingresslistener_v1alpha1.IngressListenerSpec{
-			NodeName:         "foobar",
-			ListenPort:       &listenPort,
-			TargetPort:       &targetPort,
-			RbacAllowCluster: "test-cluster",
+			NodeName:   "foobar",
+			ListenPort: int32(8080),
+			TargetPort: int32(8081),
+			Rbac: ingresslistener_v1alpha1.RBAC{
+				Cluster: "test-cluster",
+			},
 		},
 	}
 	l.Name = "foobar"
 	il.Handler(watch.Added, &ingresslistener_v1alpha1.IngressListener{}, l)
 
 	// Update the listener
-	l.Spec.RbacAllowCluster = "different-cluster"
+	l.Spec.Rbac.Cluster = "different-cluster"
 	il.Handler(watch.Modified, &ingresslistener_v1alpha1.IngressListener{}, l)
 
 	ingressListeners := il.List()

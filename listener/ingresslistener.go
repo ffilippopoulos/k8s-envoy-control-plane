@@ -16,11 +16,16 @@ import (
 )
 
 type IngressListener struct {
-	Name             string
-	NodeName         string
-	ListenPort       int32
-	TargetPort       int32
-	RbacAllowCluster string
+	Name               string
+	Namespace          string
+	NodeName           string
+	ListenPort         int32
+	TargetPort         int32
+	RbacAllowCluster   string
+	RbacAllowSANs      []string
+	TlsSecretName      string
+	CaValidationSecret string
+	Layer              string
 }
 
 type ingressListenerEventHandlerFunc func(eventType watch.EventType, old *ingresslistener_v1alpha1.IngressListener, new *ingresslistener_v1alpha1.IngressListener)
@@ -85,13 +90,18 @@ func (ils *IngressListenerStore) Init() {
 	ils.store = make(map[string]*IngressListener)
 }
 
-func (ils *IngressListenerStore) CreateOrUpdate(listenerName, nodeName, rbacAllowCluster string, listenPort, targetPort int32) {
+func (ils *IngressListenerStore) CreateOrUpdate(listenerName, namespace, nodeName, rbacAllowCluster string, rbacAllowSANs []string, tlsSecretName, caValidationSecret string, listenPort, targetPort int32, layer string) {
 	ils.store[listenerName] = &IngressListener{
-		Name:             listenerName,
-		NodeName:         nodeName,
-		ListenPort:       listenPort,
-		TargetPort:       targetPort,
-		RbacAllowCluster: rbacAllowCluster,
+		Name:               listenerName,
+		Namespace:          namespace,
+		NodeName:           nodeName,
+		ListenPort:         listenPort,
+		TargetPort:         targetPort,
+		RbacAllowCluster:   rbacAllowCluster,
+		RbacAllowSANs:      rbacAllowSANs,
+		TlsSecretName:      tlsSecretName,
+		CaValidationSecret: caValidationSecret,
+		Layer:              layer,
 	}
 }
 
