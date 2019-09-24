@@ -191,9 +191,8 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 			filters = append(filters, rbacFilter)
 		}
 	}
-	// tcp filter should always go at the bottom of the chain
 
-	// TCP filter configuration use by default
+	// tcp filter should always go at the bottom of the chain
 	config := &tcp.TcpProxy{
 		StatPrefix: "tcp",
 		ClusterSpecifier: &tcp.TcpProxy_Cluster{

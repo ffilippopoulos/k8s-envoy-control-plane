@@ -87,7 +87,6 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				rbacSANs := ingressListener.RbacAllowSANs
 
 				// Generate a local cluster
-				// TODO: that looks to override clusters in case of more than 1 local listeners, let's add the port name
 				clusterName := "ingress_" + ingressListener.Name + "_cluster"
 
 				// Get tls from tls context
@@ -146,7 +145,6 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				targetClusterIPs := targetCluster.GetIPs()
 
 				// Generate a cluster to target the upstream cluster
-				// TODO: that looks to override clusters in case of more than 1 egress listeners
 				clusterName := "egress_" + egressListener.Name + "_cluster"
 
 				// Get tls from tls context

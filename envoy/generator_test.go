@@ -5,9 +5,7 @@ import (
 	"testing"
 
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
-	//rbac_filter "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/rbac/v2"
 	"github.com/gogo/protobuf/types"
-	//pstruct "github.com/golang/protobuf/ptypes/struct"
 	"github.com/stretchr/testify/assert"
 )
 
