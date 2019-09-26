@@ -74,7 +74,7 @@ func (ilw *ingressListenerWatcher) Start(wg *sync.WaitGroup) {
 	ilw.store = store
 	wg.Done()
 
-	log.Info("Starting egressListener watcher")
+	log.Info("Starting ingressListener watcher")
 	go controller.Run(ilw.stopChannel)
 }
 

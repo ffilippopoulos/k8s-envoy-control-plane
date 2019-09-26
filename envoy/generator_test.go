@@ -1,10 +1,12 @@
 package envoy
 
 import (
-	"errors"
 	"testing"
 
+	"github.com/envoyproxy/go-control-plane/envoy/api/v2/auth"
+	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
+	"github.com/ffilippopoulos/k8s-envoy-control-plane/tls"
 	"github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,21 +16,14 @@ func TestIpRbacFilter(t *testing.T) {
 	// Test calling with empty list
 	sourceIPs := []string{}
 
-	_, err := ipRbacFilter(sourceIPs)
-	expectedErr := errors.New("Requested rbac for empty sources list")
-
-	if assert.Error(t, err) {
-		assert.Equal(t, expectedErr, err)
-	}
+	rbacFilter := ipRbacFilter(sourceIPs)
+	assert.Equal(t, listener.Filter{}, rbacFilter)
 
 	// Test calling with single ip list
 	sourceIPs = []string{
 		"10.2.0.1",
 	}
-	rbacFilter, err := ipRbacFilter(sourceIPs)
-	if err != nil {
-		t.Fatalf("error creating ip rbac filte: %v", err)
-	}
+	rbacFilter = ipRbacFilter(sourceIPs)
 
 	// Verify that we got 1 policy and 1 principal with that ip
 	// TODO: That is just mad!!
@@ -47,10 +42,7 @@ func TestIpRbacFilter(t *testing.T) {
 		"10.2.0.1",
 		"10.2.0.2",
 	}
-	rbacFilter, err = ipRbacFilter(sourceIPs)
-	if err != nil {
-		t.Fatalf("error creating ip rbac filte: %v", err)
-	}
+	rbacFilter = ipRbacFilter(sourceIPs)
 
 	// Verify that we got 1 policy and 2 principals, one for each ip
 	// TODO: That is just mad!!
@@ -72,21 +64,14 @@ func TestSanRbacFilter(t *testing.T) {
 	// Test calling with empty list
 	sourceSANs := []string{}
 
-	_, err := sanRbacFilter(sourceSANs)
-	expectedErr := errors.New("Requested rbac for empty sources list")
-
-	if assert.Error(t, err) {
-		assert.Equal(t, expectedErr, err)
-	}
+	rbacFilter := sanRbacFilter(sourceSANs)
+	assert.Equal(t, listener.Filter{}, rbacFilter)
 
 	// Test calling with single san list
 	sourceSANs = []string{
 		"test.io/bob",
 	}
-	rbacFilter, err := sanRbacFilter(sourceSANs)
-	if err != nil {
-		t.Fatalf("error creating san rbac filte: %v", err)
-	}
+	rbacFilter = sanRbacFilter(sourceSANs)
 
 	// Verify that we got 1 policy and 1 principal with that ip
 	// TODO: That is just mad!!
@@ -105,10 +90,7 @@ func TestSanRbacFilter(t *testing.T) {
 		"test.io/bob",
 		"test.io/alice",
 	}
-	rbacFilter, err = sanRbacFilter(sourceSANs)
-	if err != nil {
-		t.Fatalf("error creating san rbac filter: %v", err)
-	}
+	rbacFilter = sanRbacFilter(sourceSANs)
 
 	// Verify that we got 1 policy and 1 principal with that ip
 	// TODO: That is just mad!!
@@ -124,4 +106,90 @@ func TestSanRbacFilter(t *testing.T) {
 	authenticated = principalsList[1].Kind.(*types.Value_StructValue).StructValue.Fields["authenticated"].Kind.(*types.Value_StructValue).StructValue.Fields["principal_name"]
 	assert.Equal(t, "test.io/alice", authenticated.Kind.(*types.Value_StructValue).StructValue.Fields["exact"].Kind.(*types.Value_StringValue).StringValue)
 
+}
+
+func TestMakeDownstreamTlsContext(t *testing.T) {
+
+	// Test call empty
+	tlsContext := MakeDownstreamTlsContext(tls.Certificate{}, "")
+
+	empty := &core.DataSource_InlineString{InlineString: ""}
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].CertificateChain.Specifier,
+		empty,
+	)
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].PrivateKey.Specifier,
+		empty,
+	)
+
+	// Test no ca provided
+	cert := tls.Certificate{
+		Cert: "AAAAAAAAAAA=",
+		Key:  "AAAAAAAAAAA=",
+	}
+	tlsContext = MakeDownstreamTlsContext(cert, "")
+
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].CertificateChain.Specifier,
+		&core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+	)
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].PrivateKey.Specifier,
+		&core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+	)
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.ValidationContextType,
+		nil,
+	)
+
+	// Test ca validation present
+	ca := "AAAAAAAAAAA="
+	tlsContext = MakeDownstreamTlsContext(cert, ca)
+
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].CertificateChain.Specifier,
+		&core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+	)
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].PrivateKey.Specifier,
+		&core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+	)
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.ValidationContextType.(*auth.CommonTlsContext_ValidationContext).ValidationContext.TrustedCa.Specifier,
+		&core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+	)
+
+}
+
+func TestMakeUpstreamTlsContext(t *testing.T) {
+
+	// Test call empty
+	tlsContext := MakeUpstreamTlsContext(tls.Certificate{})
+
+	empty := &core.DataSource_InlineString{InlineString: ""}
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].CertificateChain.Specifier,
+		empty,
+	)
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].PrivateKey.Specifier,
+		empty,
+	)
+
+	// Test full
+	cert := tls.Certificate{
+		Cert: "AAAAAAAAAAA=",
+		Key:  "AAAAAAAAAAA=",
+	}
+	tlsContext = MakeUpstreamTlsContext(cert)
+
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].CertificateChain.Specifier,
+		&core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+	)
+	assert.Equal(t,
+		tlsContext.CommonTlsContext.TlsCertificates[0].PrivateKey.Specifier,
+		&core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+	)
 }
