@@ -2,7 +2,6 @@ package envoy
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
@@ -19,6 +18,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/util"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/tls"
 )
@@ -417,7 +417,9 @@ func MakeHttp2Cluster(clusterName string, port int32, IPs []string, cert tls.Cer
 func MessageToStruct(msg proto.Message) *types.Struct {
 	s, err := util.MessageToStruct(msg)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+		}).Error("Failed to wrap message to struct")
 		return &types.Struct{}
 	}
 	return s

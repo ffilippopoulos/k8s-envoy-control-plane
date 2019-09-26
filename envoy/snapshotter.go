@@ -2,7 +2,6 @@ package envoy
 
 import (
 	"context"
-	"log"
 	"strings"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/cluster"
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/listener"
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/tls"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -82,7 +82,10 @@ func (s *Snapshotter) rbacClusterIPs(cluster string) ([]string, error) {
 
 func getCertificate(namespace, secretName string) (tls.Certificate, error) {
 	if secretName != "" {
-		log.Printf("[DEBUG] looking for secret: %s/%s", namespace, secretName)
+		log.WithFields(log.Fields{
+			"namespace": namespace,
+			"secret":    secretName,
+		}).Debug("Fetching secret")
 		return tls.GetTLS(namespace, secretName)
 	}
 	return tls.Certificate{}, nil
@@ -91,7 +94,10 @@ func getCertificate(namespace, secretName string) (tls.Certificate, error) {
 
 func getCA(namespace, secretName string) (string, error) {
 	if secretName != "" {
-		log.Printf("[DEBUG] looking for secret: %s/%s", namespace, secretName)
+		log.WithFields(log.Fields{
+			"namespace": namespace,
+			"secret":    secretName,
+		}).Debug("Fetching secret")
 		return tls.GetCA(namespace, secretName)
 	}
 	return "", nil
@@ -99,10 +105,15 @@ func getCA(namespace, secretName string) (string, error) {
 
 func (s *Snapshotter) snapshot(nodes []string) error {
 	for _, node := range nodes {
-		log.Printf("[DEBUG] Updating snapshot for node %s", node)
+		log.WithFields(log.Fields{
+			"node": node,
+		}).Debug("Updating snapshot")
 		snap, err := s.snapshotCache.GetSnapshot(node)
 		if err != nil {
-			log.Printf("[ERROR] Can't find an existing snapshot for %s: %s", node, err)
+			log.WithFields(log.Fields{
+				"node": node,
+				"err":  err,
+			}).Warn("Cannot find existing snapshot, skipping update..")
 			continue
 		}
 
@@ -115,7 +126,11 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				// Find the IPs of the cluster we want to allow by RBAC
 				rbacClusterIPs, err := s.rbacClusterIPs(ingressListener.RbacAllowCluster)
 				if err != nil {
-					log.Printf("[ERROR] Can't find RBAC cluster %s, skipping ingress listener %s", ingressListener.RbacAllowCluster, ingressListener.Name)
+					log.WithFields(log.Fields{
+						"listener":  ingressListener.Name,
+						"namespace": ingressListener.Namespace,
+						"cluster":   ingressListener.RbacAllowCluster,
+					}).Error("Cannot find rbac cluster, skipping ingress listener..")
 					continue
 				}
 
@@ -127,16 +142,22 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				// Get tls from tls context
 				cert, err := getCertificate(ingressListener.Namespace, ingressListener.TlsSecretName)
 				if err != nil {
-					log.Printf("[ERROR] Can't get tls context for secret: %s in namespace %s:%v, skipping ingress listener %s",
-						ingressListener.Namespace, ingressListener.TlsSecretName, err, ingressListener.Name)
+					log.WithFields(log.Fields{
+						"listener":  ingressListener.Name,
+						"namespace": ingressListener.Namespace,
+						"secret":    ingressListener.TlsSecretName,
+					}).Error("Cannot get tls from secret, skipping ingress listener..")
 					continue
 				}
 
 				// fetch ca from secret if provided
 				ca, err := getCA(ingressListener.Namespace, ingressListener.CaValidationSecret)
 				if err != nil {
-					log.Printf("[ERROR] Can't get ca from secret: %s in namespace %s:%v, skipping ingress listener %s",
-						ingressListener.Namespace, ingressListener.CaValidationSecret, err, ingressListener.Name)
+					log.WithFields(log.Fields{
+						"listener":  ingressListener.Name,
+						"namespace": ingressListener.Namespace,
+						"secret":    ingressListener.CaValidationSecret,
+					}).Error("Cannot get ca from secret, skipping ingress listener..")
 					continue
 				}
 
@@ -170,7 +191,11 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				// Find the IPs of the pods in the target cluster
 				targetCluster, err := s.clusters.GetCluster(egressListener.TargetCluster)
 				if err != nil {
-					log.Printf("[ERROR] Can't find target cluster %s, skipping egress listener %s", egressListener.TargetCluster, egressListener.Name)
+					log.WithFields(log.Fields{
+						"listener":  egressListener.Name,
+						"namespace": egressListener.Namespace,
+						"cluster":   egressListener.TargetCluster,
+					}).Error("Cannot find target cluster, skipping egress listener..")
 					continue
 				}
 				targetClusterIPs := targetCluster.GetIPs()
@@ -181,8 +206,11 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 				// Get tls from tls context
 				cert, err := getCertificate(egressListener.Namespace, egressListener.TlsSecretName)
 				if err != nil {
-					log.Printf("[ERROR] Can't get tls context for secret: %s in namespace %s:%v, skipping ingress listener %s",
-						egressListener.Namespace, egressListener.TlsSecretName, err, egressListener.Name)
+					log.WithFields(log.Fields{
+						"listener":  egressListener.Name,
+						"namespace": egressListener.Namespace,
+						"secret":    egressListener.TlsSecretName,
+					}).Error("Cannot get tls from secret, skipping egress listener..")
 					continue
 				}
 
@@ -219,37 +247,36 @@ func (s *Snapshotter) snapshot(nodes []string) error {
 }
 
 func (s *Snapshotter) OnStreamOpen(ctx context.Context, streamID int64, streamType string) error {
-	log.Println("[DEBUG] stream open: ", streamID, streamType)
+	log.WithFields(log.Fields{
+		"streamID":   streamID,
+		"streanType": streamType,
+	}).Debug("Stream Open")
 	return nil
 }
+
 func (s *Snapshotter) OnStreamClosed(streamID int64) {
-	log.Println("[DEBUG] stream closed: ", streamID)
+	log.WithFields(log.Fields{
+		"streamID": streamID,
+	}).Debug("Stream Closed")
 }
+
 func (s *Snapshotter) OnStreamRequest(streamID int64, req *v2.DiscoveryRequest) error {
-	log.Printf(`[DEBUG] Request:
------------
-    STREAM: %d
-  RECEIVED: %s
-      NODE: %s
-   CLUSTER: %s
-  LOCALITY: %s
-     NAMES: %s
-     NONCE: %s
-   VERSION: %s
-`,
-		streamID,
-		req.GetTypeUrl(),
-		req.GetNode().GetId(),
-		req.GetNode().GetCluster(),
-		req.GetNode().GetLocality(),
-		strings.Join(req.GetResourceNames(), ", "),
-		req.GetResponseNonce(),
-		req.GetVersionInfo(),
-	)
+	log.WithFields(log.Fields{
+		"STREAM":   streamID,
+		"RECEIVED": req.GetTypeUrl(),
+		"NODE":     req.GetNode().GetId(),
+		"CLUSTER":  req.GetNode().GetCluster(),
+		"LOCALITY": req.GetNode().GetLocality(),
+		"NAMES":    strings.Join(req.GetResourceNames(), ", "),
+		"NONCE":    req.GetResponseNonce(),
+		"VERSION":  req.GetVersionInfo(),
+	}).Debug("Request")
 
 	// Add a snapshot for the node to the cache if one doesn't already exist
 	if _, err := s.snapshotCache.GetSnapshot(req.Node.Id); err != nil {
-		log.Printf("[DEBUG] Creating snapshot for node %s", req.Node.Id)
+		log.WithFields(log.Fields{
+			"node": req.Node.Id,
+		}).Info("Creating new snapshot")
 		s.snapshotCache.SetSnapshot(req.Node.Id, cache.Snapshot{})
 		s.snapshot([]string{req.Node.Id})
 	}
@@ -261,14 +288,14 @@ func (s *Snapshotter) OnStreamResponse(
 	req *v2.DiscoveryRequest,
 	resp *v2.DiscoveryResponse,
 ) {
-	log.Printf(
-		"[DEBUG] Response: responding (%d) with type: %s, version: %s, resources: %d",
-		streamID,
-		resp.GetTypeUrl(),
-		resp.GetVersionInfo(),
-		len(resp.GetResources()),
-	)
+	log.WithFields(log.Fields{
+		"streamID":  streamID,
+		"type":      resp.GetTypeUrl(),
+		"version":   resp.GetVersionInfo(),
+		"resources": len(resp.GetResources()),
+	}).Debug("Response")
 }
+
 func (s *Snapshotter) OnFetchRequest(ctx context.Context, req *v2.DiscoveryRequest) error {
 	return nil
 }

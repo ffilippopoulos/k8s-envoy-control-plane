@@ -3,8 +3,8 @@ package tls
 import (
 	"errors"
 	"fmt"
-	"log"
 
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -14,12 +14,12 @@ var k8sClient kubernetes.Interface
 
 func Init(client kubernetes.Interface) {
 	k8sClient = client
-	log.Println("[Debug] tls k8s client initialized")
+	log.Debug("tls k8s client initialized")
 }
 
 func GetTLS(namespace, secretName string) (Certificate, error) {
 	if secretName == "" {
-		log.Println("[WARN] no secret name provided")
+		log.Warn("No secret name provided")
 		return Certificate{}, errors.New("secret name empty")
 	}
 
@@ -66,7 +66,7 @@ func getCertificateBlocks(secret *corev1.Secret) (string, string, error) {
 
 func GetCA(namespace, secretName string) (string, error) {
 	if secretName == "" {
-		log.Println("[WARN] no secret name provided")
+		log.Warn("No secret name provided")
 		return "", errors.New("secret name empty")
 	}
 

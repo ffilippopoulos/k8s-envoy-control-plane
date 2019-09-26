@@ -2,13 +2,12 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"log"
 	"net"
 	"os"
 	"sync"
 
 	discover "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"k8s.io/client-go/kubernetes"
 
@@ -27,6 +26,7 @@ var (
 	// flags
 	flagSourcesConfigPath = flag.String("sources", "", "(Required) Path of the config file that keeps static sources configuration")
 	flagClusterNameAnno   = flag.String("cluster-name-annotation", "cluster-name.envoy.uw.io", "Annotation that will mark a pod as part of a cluster")
+	flagLogLevel          = flag.String("log-level", "warning", "log level trace|debug|info|warning|error|fatal|panic")
 )
 
 // Hasher hashes
@@ -54,9 +54,20 @@ func main() {
 		usage()
 	}
 
+	// Initialise logging
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
+	logLevel, err := log.ParseLevel(*flagLogLevel)
+	if err != nil {
+		usage()
+	}
+	log.SetLevel(logLevel)
+
 	k8sSources, err := LoadSourcesConfig(*flagSourcesConfigPath)
 	if err != nil {
-		log.Fatal("Reading sources config failed: ", err)
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Fatal("Reading sources config failed")
 	}
 
 	clusterSources := []kubernetes.Interface{}
@@ -66,7 +77,10 @@ func main() {
 	for _, s := range k8sSources {
 		client, err := cluster.GetClient(s.KubeConfig)
 		if err != nil {
-			log.Fatal(fmt.Sprintf("getting client for k8s cluster: %s failed", s.Name), err)
+			log.WithFields(log.Fields{
+				"cluster": s.Name,
+				"err":     err,
+			}).Fatal("Getting client for k8s cluster failed")
 		}
 
 		clusterSources = append(clusterSources, client)
@@ -74,7 +88,10 @@ func main() {
 		if s.ListenerSource {
 			lClient, err := listener.GetClient(s.KubeConfig)
 			if err != nil {
-				log.Fatal(fmt.Sprintf("getting client for k8s cluster: %s failed", s.Name), err)
+				log.WithFields(log.Fields{
+					"cluster": s.Name,
+					"err":     err,
+				}).Fatal("Getting client for k8s cluster failed")
 			}
 			listenerSources = append(listenerSources, lClient)
 
@@ -116,7 +133,9 @@ func main() {
 
 	go func() {
 		if err = grpcServer.Serve(lis); err != nil {
-			log.Fatalf("Failed to start grpc server: %v", err)
+			log.WithFields(log.Fields{
+				"err": err,
+			}).Fatal("Failed to start grpc server")
 		}
 	}()
 
