@@ -2,10 +2,10 @@ package cluster
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,14 +55,14 @@ func (sw *podWatcher) Start(wg *sync.WaitGroup) {
 	}
 	store, controller := cache.NewInformer(listWatch, &v1.Pod{}, sw.resyncPeriod, eventHandler)
 	sw.store = store
-	log.Println("[INFO] starting pod watcher")
+	log.Info("Starting pod watcher")
 	wg.Done()
 	controller.Run(sw.stopChannel)
-	log.Println("[INFO] pod watcher stopped")
+	log.Info("Stopped pod watcher")
 }
 
 func (sw *podWatcher) Stop() {
-	log.Println("[INFO] stopping ingress watcher ...")
+	log.Info("Stopping pod watcher...")
 	close(sw.stopChannel)
 }
 

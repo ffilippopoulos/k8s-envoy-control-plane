@@ -15,3 +15,7 @@
 [[constraint]]
   name = "github.com/envoyproxy/go-control-plane"
   version = "0.8.1"
+
+[[constraint]]
+  name = "github.com/sirupsen/logrus"
+  version = "v1.4.2"

@@ -2,8 +2,8 @@ package cluster
 
 import (
 	"errors"
-	"log"
 
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -40,7 +40,11 @@ func (ca *ClusterAggregator) Handler(eventType watch.EventType, old *v1.Pod, new
 	case watch.Added:
 		if clusterName, ok := new.Annotations[ca.clusterAnnotation]; ok {
 			if new.Status.PodIP != "" {
-				log.Printf("[DEBUG] received %s event for cluster %s ip: %s", eventType, clusterName, new.Status.PodIP)
+				log.WithFields(log.Fields{
+					"type":    eventType,
+					"cluster": clusterName,
+					"podIP":   new.Status.PodIP,
+				}).Debug("Received cluster event")
 				ca.clusterStore.CreateOrUpdate(clusterName, new.Name, new.Status.PodIP)
 				ca.events <- new
 			}
@@ -48,19 +52,29 @@ func (ca *ClusterAggregator) Handler(eventType watch.EventType, old *v1.Pod, new
 	case watch.Modified:
 		if clusterName, ok := new.Annotations[ca.clusterAnnotation]; ok {
 			if new.Status.PodIP != "" {
-				log.Printf("[DEBUG] received %s event for cluster %s ip: %s", eventType, clusterName, new.Status.PodIP)
+				log.WithFields(log.Fields{
+					"type":    eventType,
+					"cluster": clusterName,
+					"podIP":   new.Status.PodIP,
+				}).Debug("Received cluster event")
 				ca.clusterStore.CreateOrUpdate(clusterName, new.Name, new.Status.PodIP)
 				ca.events <- new
 			}
 		}
 	case watch.Deleted:
 		if clusterName, ok := old.Annotations[ca.clusterAnnotation]; ok {
-			log.Printf("[DEBUG] received %s event for cluster %s ip: %s", eventType, clusterName, old.Status.PodIP)
+			log.WithFields(log.Fields{
+				"type":    eventType,
+				"cluster": clusterName,
+				"podIP":   old.Status.PodIP,
+			}).Debug("Received cluster event")
 			ca.clusterStore.Delete(clusterName, old.Name)
 			ca.events <- old
 		}
 	default:
-		log.Printf("[DEBUG] received %s event: cannot handle", eventType)
+		log.WithFields(log.Fields{
+			"type": eventType,
+		}).Debug("Received unknown cluster event")
 	}
 }
 

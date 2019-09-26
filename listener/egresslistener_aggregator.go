@@ -1,12 +1,12 @@
 package listener
 
 import (
-	"log"
 	"sync"
 	"time"
 
 	egresslistener_v1alpha1 "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/apis/egresslistener/v1alpha1"
 	egresslistener_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -42,19 +42,42 @@ func (sa *EgressListenerAggregator) Start() error {
 func (sa *EgressListenerAggregator) handler(eventType watch.EventType, old *egresslistener_v1alpha1.EgressListener, new *egresslistener_v1alpha1.EgressListener) {
 	switch eventType {
 	case watch.Added:
-		log.Printf("[DEBUG] received %s event for egress listener %s: 127.0.0.1:%d -> %s:%d", eventType, new.Name, new.Spec.ListenPort, new.Spec.Target.Cluster, new.Spec.Target.Port)
+		log.WithFields(log.Fields{
+			"type":       eventType,
+			"name":       new.Name,
+			"namespace":  new.Namespace,
+			"listenPort": new.Spec.ListenPort,
+			"cluster":    new.Spec.Target.Cluster,
+			"targetPort": new.Spec.Target.Port,
+		}).Debug("Received event for egress listener")
 		sa.egressListenerStore.CreateOrUpdate(new.Name, new.Namespace, new.Spec.NodeName, new.Spec.Target.Cluster, new.Spec.LbPolicy, new.Spec.ListenPort, new.Spec.Target.Port, new.Spec.Tls.Secret)
 		sa.events <- new
 	case watch.Modified:
-		log.Printf("[DEBUG] received %s event for egress listener %s: 127.0.0.1:%d -> %s:%d", eventType, new.Name, new.Spec.ListenPort, new.Spec.Target.Cluster, new.Spec.Target.Port)
+		log.WithFields(log.Fields{
+			"type":       eventType,
+			"name":       new.Name,
+			"namespace":  new.Namespace,
+			"listenPort": new.Spec.ListenPort,
+			"cluster":    new.Spec.Target.Cluster,
+			"targetPort": new.Spec.Target.Port,
+		}).Debug("Received event for egress listener")
 		sa.egressListenerStore.CreateOrUpdate(new.Name, new.Namespace, new.Spec.NodeName, new.Spec.Target.Cluster, new.Spec.LbPolicy, new.Spec.ListenPort, new.Spec.Target.Port, new.Spec.Tls.Secret)
 		sa.events <- new
 	case watch.Deleted:
-		log.Printf("[DEBUG] received %s event for egress listener %s: 127.0.0.1:%d -> %s:%d", eventType, new.Name, new.Spec.ListenPort, new.Spec.Target.Cluster, new.Spec.Target.Port)
+		log.WithFields(log.Fields{
+			"type":       eventType,
+			"name":       new.Name,
+			"namespace":  new.Namespace,
+			"listenPort": new.Spec.ListenPort,
+			"cluster":    new.Spec.Target.Cluster,
+			"targetPort": new.Spec.Target.Port,
+		}).Debug("Received event for egress listener")
 		sa.egressListenerStore.Delete(old.Name)
 		sa.events <- old
 	default:
-		log.Printf("[DEBUG] received %s event: cannot handle", eventType)
+		log.WithFields(log.Fields{
+			"type": eventType,
+		}).Debug("Received unknown cluster event")
 	}
 }
 

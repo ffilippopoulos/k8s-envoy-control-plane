@@ -1,10 +1,10 @@
 package listener
 
 import (
-	"log"
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,12 +72,11 @@ func (ilw *egressListenerWatcher) Start(wg *sync.WaitGroup) {
 	ilw.store = store
 	wg.Done()
 
-	log.Println("[INFO] starting egressListener watcher")
+	log.Info("Starting egressListener watcher")
 	go controller.Run(ilw.stopChannel)
 }
 
 func (ilw *egressListenerWatcher) List() {
-	log.Println(ilw.client.EgresslistenerV1alpha1().EgressListeners(v1.NamespaceAll).List(metav1.ListOptions{}))
 }
 
 type EgressListenerStore struct {
