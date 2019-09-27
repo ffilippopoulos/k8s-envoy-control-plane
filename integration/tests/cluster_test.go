@@ -11,6 +11,7 @@ import (
 	ingresslistener_v1alpha1 "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/apis/ingresslistener/v1alpha1"
 	ingresslistener_clientset "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned"
 	il_fake "github.com/ffilippopoulos/k8s-envoy-control-plane/pkg/client/clientset/versioned/fake"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -25,6 +26,9 @@ var (
 )
 
 func TestListenerIPRbac(t *testing.T) {
+	// Set log level to debug
+	log.SetLevel(log.DebugLevel)
+
 	source := fake.NewSimpleClientset()
 	ca := cluster.NewClusterAggregator([]kubernetes.Interface{source}, "cluster-name.envoy.uw.io")
 	ca.Start()
@@ -50,10 +54,9 @@ func TestListenerIPRbac(t *testing.T) {
 	targetPort := int32(8081)
 	newListener := &ingresslistener_v1alpha1.IngressListener{
 		Spec: ingresslistener_v1alpha1.IngressListenerSpec{
-			NodeName:         "test-client",
-			ListenPort:       &listenPort,
-			TargetPort:       &targetPort,
-			RbacAllowCluster: "test-cluster",
+			NodeName:   "test-client",
+			ListenPort: listenPort,
+			TargetPort: targetPort,
 		},
 	}
 	newListener.Name = "test"

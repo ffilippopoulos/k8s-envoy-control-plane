@@ -1,7 +1,6 @@
 package envoy
 
 import (
-	"errors"
 	"time"
 
 	v2 "github.com/envoyproxy/go-control-plane/envoy/api/v2"
@@ -23,7 +22,7 @@ import (
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/tls"
 )
 
-func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
+func ipRbacFilter(sourceIPs []string) listener.Filter {
 
 	if len(sourceIPs) > 0 {
 		// One principal per ip address
@@ -66,13 +65,13 @@ func ipRbacFilter(sourceIPs []string) (listener.Filter, error) {
 			ConfigType: &listener.Filter_Config{
 				Config: MessageToStruct(rbac),
 			},
-		}, nil
+		}
 	}
 
-	return listener.Filter{}, errors.New("Requested rbac for empty sources list")
+	return listener.Filter{}
 }
 
-func sanRbacFilter(sans []string) (listener.Filter, error) {
+func sanRbacFilter(sans []string) listener.Filter {
 
 	if len(sans) > 0 {
 		// One exact match principal per san
@@ -120,10 +119,10 @@ func sanRbacFilter(sans []string) (listener.Filter, error) {
 			ConfigType: &listener.Filter_Config{
 				Config: MessageToStruct(rbac),
 			},
-		}, nil
+		}
 	}
 
-	return listener.Filter{}, errors.New("Requested rbac for empty sources list")
+	return listener.Filter{}
 }
 
 func MakeDownstreamTlsContext(cert tls.Certificate, ca string) *auth.DownstreamTlsContext {
@@ -152,7 +151,7 @@ func MakeDownstreamTlsContext(cert tls.Certificate, ca string) *auth.DownstreamT
 	return tlsContext
 }
 
-func MakeUpstreamTlsContect(cert tls.Certificate) *auth.UpstreamTlsContext {
+func MakeUpstreamTlsContext(cert tls.Certificate) *auth.UpstreamTlsContext {
 	tlsContext := &auth.UpstreamTlsContext{}
 	tlsContext.CommonTlsContext = &auth.CommonTlsContext{
 		TlsCertificates: []*auth.TlsCertificate{
@@ -175,21 +174,13 @@ func MakeTCPListener(listenerName string, port int32, clusterName string, source
 	filters := []listener.Filter{}
 
 	if len(sourceIPs) > 0 {
-		rbacFilter, err := ipRbacFilter(sourceIPs)
-		if err != nil {
-
-		} else {
-			filters = append(filters, rbacFilter)
-		}
+		rbacFilter := ipRbacFilter(sourceIPs)
+		filters = append(filters, rbacFilter)
 	}
 
 	if len(sourceSANs) > 0 {
-		rbacFilter, err := sanRbacFilter(sourceSANs)
-		if err != nil {
-
-		} else {
-			filters = append(filters, rbacFilter)
-		}
+		rbacFilter := sanRbacFilter(sourceSANs)
+		filters = append(filters, rbacFilter)
 	}
 
 	// tcp filter should always go at the bottom of the chain
@@ -244,21 +235,13 @@ func MakeHttpListener(listenerName string, port int32, clusterName string, sourc
 	filters := []listener.Filter{}
 
 	if len(sourceIPs) > 0 {
-		rbacFilter, err := ipRbacFilter(sourceIPs)
-		if err != nil {
-
-		} else {
-			filters = append(filters, rbacFilter)
-		}
+		rbacFilter := ipRbacFilter(sourceIPs)
+		filters = append(filters, rbacFilter)
 	}
 
 	if len(sourceSANs) > 0 {
-		rbacFilter, err := sanRbacFilter(sourceSANs)
-		if err != nil {
-
-		} else {
-			filters = append(filters, rbacFilter)
-		}
+		rbacFilter := sanRbacFilter(sourceSANs)
+		filters = append(filters, rbacFilter)
 	}
 
 	manager := &hcm.HttpConnectionManager{
@@ -382,7 +365,7 @@ func MakeCluster(clusterName string, port int32, IPs []string, cert tls.Certific
 	}
 
 	if cert.Cert != "" && cert.Key != "" {
-		tlsContext := MakeUpstreamTlsContect(cert)
+		tlsContext := MakeUpstreamTlsContext(cert)
 		cluster.TlsContext = tlsContext
 	}
 	return cluster
@@ -407,7 +390,7 @@ func MakeHttp2Cluster(clusterName string, port int32, IPs []string, cert tls.Cer
 	}
 
 	if cert.Cert != "" && cert.Key != "" {
-		tlsContext := MakeUpstreamTlsContect(cert)
+		tlsContext := MakeUpstreamTlsContext(cert)
 		tlsContext.CommonTlsContext.AlpnProtocols = []string{"h2", "http/1.1"}
 		cluster.TlsContext = tlsContext
 	}
