@@ -6,6 +6,8 @@ import (
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/auth"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
+	tcp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
+	"github.com/envoyproxy/go-control-plane/pkg/util"
 	"github.com/ffilippopoulos/k8s-envoy-control-plane/tls"
 	"github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
@@ -192,4 +194,191 @@ func TestMakeUpstreamTlsContext(t *testing.T) {
 		tlsContext.CommonTlsContext.TlsCertificates[0].PrivateKey.Specifier,
 		&core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
 	)
+}
+
+func TestMakeTCPListener(t *testing.T) {
+	// Input vars
+	var listenerName, clusterName, listenAddress, ca string
+	var port int32
+	var sourceIPs, sourceSANs []string
+	var cert tls.Certificate
+
+	clusterName = "test"
+	// tcp filter
+	config := &tcp.TcpProxy{
+		StatPrefix: "tcp",
+		ClusterSpecifier: &tcp.TcpProxy_Cluster{
+			Cluster: "test",
+		},
+	}
+	pbst, err := types.MarshalAny(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tcpFilter := listener.Filter{
+		Name: util.TCPProxy,
+		ConfigType: &listener.Filter_TypedConfig{
+			TypedConfig: pbst,
+		},
+	}
+
+	// Test empty only generates a tcp filter
+	l := MakeTCPListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+
+	assert.Equal(t, 1, len(l.FilterChains[0].Filters))
+	assert.Equal(t, tcpFilter, l.FilterChains[0].Filters[0])
+
+	// Test Rbac Filters Creation
+	sourceIPs = []string{"1.1.1.1", "2.2.2.2"}
+	sourceSANs = []string{"test.io/bob", "test.io/alice"}
+
+	var emptyTLSContext *auth.DownstreamTlsContext = nil
+
+	l = MakeTCPListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+	assert.Equal(t, 3, len(l.FilterChains[0].Filters))
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[0].Name)
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[1].Name)
+	assert.Equal(t, tcpFilter, l.FilterChains[0].Filters[2])
+	assert.Equal(t, emptyTLSContext, l.FilterChains[0].TlsContext)
+
+	// Test tls context
+	// missing key will bypass tls
+	cert = tls.Certificate{
+		Cert: "AAAAAAAAAAA=",
+	}
+	l = MakeTCPListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+
+	assert.Equal(t, 3, len(l.FilterChains[0].Filters))
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[0].Name)
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[1].Name)
+	assert.Equal(t, tcpFilter, l.FilterChains[0].Filters[2])
+	assert.Equal(t, emptyTLSContext, l.FilterChains[0].TlsContext)
+
+	cert = tls.Certificate{
+		Cert: "AAAAAAAAAAA=",
+		Key:  "AAAAAAAAAAA=",
+	}
+	// Certificate will create tls context
+	expectedContext := &auth.DownstreamTlsContext{}
+	expectedContext.CommonTlsContext = &auth.CommonTlsContext{
+		TlsCertificates: []*auth.TlsCertificate{
+			&auth.TlsCertificate{
+				CertificateChain: &core.DataSource{
+					Specifier: &core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+				},
+				PrivateKey: &core.DataSource{
+					Specifier: &core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+				},
+			},
+		},
+	}
+	l = MakeTCPListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+
+	assert.Equal(t, 3, len(l.FilterChains[0].Filters))
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[0].Name)
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[1].Name)
+	assert.Equal(t, tcpFilter, l.FilterChains[0].Filters[2])
+	assert.Equal(t, expectedContext, l.FilterChains[0].TlsContext)
+
+	// Test ca adds to context
+	ca = "AAAAAAAAAAA="
+	expectedContext.CommonTlsContext.ValidationContextType = &auth.CommonTlsContext_ValidationContext{
+		ValidationContext: &auth.CertificateValidationContext{
+			TrustedCa: &core.DataSource{
+				Specifier: &core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+			},
+		},
+	}
+	l = MakeTCPListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+
+	assert.Equal(t, 3, len(l.FilterChains[0].Filters))
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[0].Name)
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[1].Name)
+	assert.Equal(t, tcpFilter, l.FilterChains[0].Filters[2])
+	assert.Equal(t, expectedContext, l.FilterChains[0].TlsContext)
+}
+
+func TestMakeHttpListener(t *testing.T) {
+	// Input vars
+	var listenerName, clusterName, listenAddress, ca string
+	var port int32
+	var sourceIPs, sourceSANs []string
+	var cert tls.Certificate
+
+	// Testy empty input just returns 1 http manager filter
+	l := MakeHttpListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+	assert.Equal(t, 1, len(l.FilterChains))
+	assert.Equal(t, 1, len(l.FilterChains[0].Filters))
+	assert.Equal(t, util.HTTPConnectionManager, l.FilterChains[0].Filters[0].Name)
+
+	// Test Rbac Filters Creation
+	sourceIPs = []string{"1.1.1.1", "2.2.2.2"}
+	sourceSANs = []string{"test.io/bob", "test.io/alice"}
+
+	var emptyTLSContext *auth.DownstreamTlsContext = nil
+
+	l = MakeHttpListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+	assert.Equal(t, 3, len(l.FilterChains[0].Filters))
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[0].Name)
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[1].Name)
+	assert.Equal(t, util.HTTPConnectionManager, l.FilterChains[0].Filters[2].Name)
+	assert.Equal(t, emptyTLSContext, l.FilterChains[0].TlsContext)
+
+	// Test tls context
+	// missing key will bypass tls
+	cert = tls.Certificate{
+		Cert: "AAAAAAAAAAA=",
+	}
+	l = MakeHttpListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+
+	assert.Equal(t, 3, len(l.FilterChains[0].Filters))
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[0].Name)
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[1].Name)
+	assert.Equal(t, util.HTTPConnectionManager, l.FilterChains[0].Filters[2].Name)
+	assert.Equal(t, emptyTLSContext, l.FilterChains[0].TlsContext)
+
+	cert = tls.Certificate{
+		Cert: "AAAAAAAAAAA=",
+		Key:  "AAAAAAAAAAA=",
+	}
+	// Certificate will create tls context with the respective alpn_protocols
+	expectedContext := &auth.DownstreamTlsContext{}
+	expectedContext.CommonTlsContext = &auth.CommonTlsContext{
+		TlsCertificates: []*auth.TlsCertificate{
+			&auth.TlsCertificate{
+				CertificateChain: &core.DataSource{
+					Specifier: &core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+				},
+				PrivateKey: &core.DataSource{
+					Specifier: &core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+				},
+			},
+		},
+		AlpnProtocols: []string{"h2", "http/1.1"},
+	}
+	l = MakeHttpListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+
+	assert.Equal(t, 3, len(l.FilterChains[0].Filters))
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[0].Name)
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[1].Name)
+	assert.Equal(t, util.HTTPConnectionManager, l.FilterChains[0].Filters[2].Name)
+	assert.Equal(t, expectedContext, l.FilterChains[0].TlsContext)
+
+	// Test ca adds to context
+	ca = "AAAAAAAAAAA="
+	expectedContext.CommonTlsContext.ValidationContextType = &auth.CommonTlsContext_ValidationContext{
+		ValidationContext: &auth.CertificateValidationContext{
+			TrustedCa: &core.DataSource{
+				Specifier: &core.DataSource_InlineString{InlineString: "AAAAAAAAAAA="},
+			},
+		},
+	}
+	l = MakeHttpListener(listenerName, port, clusterName, sourceIPs, sourceSANs, listenAddress, cert, ca)
+
+	assert.Equal(t, 3, len(l.FilterChains[0].Filters))
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[0].Name)
+	assert.Equal(t, "envoy.filters.network.rbac", l.FilterChains[0].Filters[1].Name)
+	assert.Equal(t, util.HTTPConnectionManager, l.FilterChains[0].Filters[2].Name)
+	assert.Equal(t, expectedContext, l.FilterChains[0].TlsContext)
 }

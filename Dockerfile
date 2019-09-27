@@ -9,7 +9,7 @@ ENV CGO_ENABLED 0
 RUN apk --no-cache add ca-certificates git && \
   go get -u github.com/golang/dep/cmd/dep && \
   /go/bin/dep ensure && \
-  go test `go list ./... | grep -v integration` && \
+  go test -v `go list ./... | grep -v integration | grep -v pkg` && \
   (cd cmd/ && go build -o /k8s-envoy-control-plane .)
 
 FROM alpine:3.10
