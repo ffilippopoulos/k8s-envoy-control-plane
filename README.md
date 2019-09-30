@@ -1,125 +1,148 @@
 # k8s-envoy-control-plane
 
-This is an example implementation of a simple Envoy control plane.
+This is an example implementation of an opionionated and simple Envoy control plane. It uses custom kubernetes resources to wrap envoy configurations for clusters and listeners creation.
+It's goal is to support secure communication via envoy sidecars in cross cluster setups where there is a flat network between clusters.
 
 In brief, this is how it works:
-* Pods are registered to clusters by the annotation `cluster-name.envoy.uw.io: <cluster-name>`. This allows the control
+* Pods are registered to envoy clusters by the annotations (default `cluster-name.envoy.uw.io: <cluster-name>`). This allows the control
   plane to discover and route to the pods.
 * Two custom resource definitions (`IngressListener`, `EgressListener`) in Kubernetes are used to define ingress and egress listeners.
+* All listeners can configure their tls context using certificates fetched from kubernetes secrets.
 
-## Quick Demo
-Create two separate kubeconfig files, one for `exp-1-aws` and another for `exp-1-gcp`.
+## Deploy
 
-Copy `config.example.json` to `config.json` and update the paths to match your kubeconfig files.
-```
-$ cp config.example.json config.json
-$ cat config.json
-[
-  {
-    "name": "aws",
-    "kubeconfig": "/Users/robertbest/tempconfig/aws-kubeconf"
-  },
-  {
-    "name": "gcp",
-    "kubeconfig": "/Users/robertbest/tempconfig/gcp-kubeconf"
-  }
-]
-```
+Templates to deploy using `kustomize` are provided [here](./deploy).
+Also there are examples to deploy the the [control-plane](./deploy/example/control-plane/) as well as examples of usage for [tcp](./deploy/example/tcp/) and [http](deploy/example/http/) configurations.
+It is handy for every namespace to include a [configMap](./deploy/example/tcp/envoy-cp-config.yaml) that points envoy instances to the control plane, as this is shared by all the instances.
 
-Create the CRDs
+Along with fetching the upstream manifests, secrets that include kubeconfigs for the controlled kubernetes clusters need to be created.
+An example script to generate one:
 ```
-$ cd manifests/crds/
-$ kubectl --context=exp-1-aws -n labs apply -f .
-```
+# Input vars
+# your server name goes here
+server=<server-name>:<port>
+# the name of the secret containing the service account token goes here
+name=<secret-name>
+# namespace and context of the secret
+namespace=<namespace>
+context=<context>
+suffix=<suffix>
 
-Start the control plane
-```
-$ make run
-2019/06/27 08:57:23 [INFO] starting pod watcher
-2019/06/27 08:57:23 [INFO] starting pod watcher
-2019/06/27 08:57:23 [INFO] starting ingressListener watcher
-2019/06/27 08:57:23 [INFO] starting egressListener watcher
-2019/06/27 08:57:23 [INFO] starting egressListener watcher
-2019/06/27 08:57:23 [INFO] starting ingressListener watcher
-```
+ca=$(kubectl --context=${context} --namespace=${namespace} get secret/$name -o jsonpath='{.data.ca\.crt}')
+token=$(kubectl --context=${context} --namespace=${namespace} get secret/$name -o jsonpath='{.data.token}' | base64 --decode)
+namespace=$(kubectl --context=${context} --namespace=${namespace} get secret/$name -o jsonpath='{.data.namespace}' | base64 --decode)
 
-Start a local instance of envoy that uses the control plane
-```
-$ make local-envoy
-$ make local-envoy-mac # on macOS
-```
+echo "
+current-context: kube-${suffix}
+apiVersion: v1
+clusters:
+- cluster:
+    server: ${server}
+    certificate-authority-data: ${ca}
+  name: kube-${suffix}
+contexts:
+- context:
+    cluster: kube-${suffix}
+    user: service-account
+  name: kube-${custom}
+kind: Config
+users:
+- name: service-account
+  user:
+    token: ${token}" > sa-${suffix}.kubeconfig
 
-You can inspect the current Envoy config by visting `/config_dump`
-```
-$ curl http://localhost:9901/config_dump
-```
+kubeconfig=$(cat sa-${suffix}.kubeconfig | base64 -w 0)
 
-Create a pod in the cluster 'test-cluster', an `IngressListener` for the app 'test-app' and an `EgressListener` that allows
-'test-app' to query `test-cluster:8080` by making requests to envoy at `127.0.0.1:9090`.
-```
-$ cd manifests/examples
-$ kubectl --context=exp-1-aws -n labs apply -f .
-```
-
-You should see events registered in the logs of the control plane
-```
-2019/06/27 09:16:45 [DEBUG] received ADDED event for cluster test-cluster ip: 10.2.7.139
-```
-```
-2019/06/27 09:20:45 [DEBUG] received ADDED event for ingress listener example-listener: 0.0.0.0:8080 -> 127.0.0.1:8081
-2019/06/27 09:20:45 [DEBUG] Updating snapshot for node test-app
-2019/06/27 09:20:45 [DEBUG] Response: responding (2) with type: type.googleapis.com/envoy.api.v2.Cluster, version: 2019-06-27 01:20:45.705178 +0100 BST m=+240.565251561, resources: 1
-2019/06/27 09:20:45 [DEBUG] Response: responding (1) with type: type.googleapis.com/envoy.api.v2.Listener, version: 2019-06-27 01:20:45.705185 +0100 BST m=+240.565257900, resources: 1
+echo "
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-${suffix}
+  namespace: kube-system
+data:
+  ca.crt: ${ca}
+  kubeconfig: ${kubeconfig}
+" > secret-${suffix}.yaml
 ```
 
-Check `http://localhost:9901/config_dump` to see the listeners and clusters that have been added to Envoy by the control plane.
+## Static Configuration
 
-Add another pod, to gcp this time, to see the cluster update:
 ```
-$ kubectl --context=exp-1-gcp -n labs apply -f clusterpod.yaml
+  -cluster-name-annotation string
+        Annotation that will mark a pod as part of a cluster (default "cluster-name.envoy.uw.io")
+  -log-level string
+        log level trace|debug|info|warning|error|fatal|panic (default "warning")
+  -sources string
+        (Required) Path of the config file that keeps static sources configuration
 ```
 
-## How it works
+### Sources configuration - control plane
+
+Each source is a kubernetes cluster that the control plane is going to watch events from. An example config will be:
+
+```
+    [
+      {
+        "name": "aws",
+        "kubeconfig": "/etc/aws/aws.kubeconfig",
+        "listenersource": true
+      },
+      {
+        "name": "gcp",
+        "kubeconfig": "/etc/gcp/gcp.kubeconfig",
+        "listenersource": false
+      }
+    ]
+
+```
+
+You need to supply a list of source and the location of the respective kubeconfig files.
+`listenersource` defines the primary kubernetes cluster, meaning the cluster which the control plane will watch for listeners. It should be set to true only for 1 cluster, the same one that the control plane is deployed. That way envoy sidecars in each kubernetes cluster will talk to the local control plane to fetch config, listeners will only be defined in the same cluster where the envoy sidecar is running and clusters will be generated from all the available sources.
+Losing networking between clusters means that remote cluster members will disappear but everything will keep working for the local cluster.
+
+## Dynamic Configuration - envoy
+
+Configuration for listeners is generated via 2 kubernetes custom resources.
+
 ### IngressListener
-```yaml
+
+```
 apiVersion: ingresslistener.envoy.uw.systems/v1alpha1
 kind: IngressListener
 metadata:
-  name: example-listener
+  name: <name>
 spec:
-  nodename: test-app
-  listenport: 8080
-  targetport: 8081
-  rbacallowcluster: test-cluster
+  nodename: <envoy-node-name>
+  listenport: 8080 # Port to listen for ingress traffic
+  targetport: 80 # Port to forward on localhost
+  rbac:
+    cluster: <cluster> # Only accept incoming traffic from cluster
+    sans: # List of SANs to accept traffic from in case of tls
+    - cluster.aws.io/bob
+    - cluster.aws.io/alice
+  tls:
+    secret: <secret-name> # kubernetes.io/tls secret that contains `tls.crt` and `tls.key` for the tls context
+    validation: <secret-name> # secret that contains `ca.crt` to be used for cert validation
 ```
-The `IngressListener` CRD defines a listener on `0.0.0.0:listenport` which routes requests to a local cluster defined as `127.0.0.1:targetport`. Access is
-restricted by an RBAC filter to source IPs belonging to pods in the cluster defined by `rbacallowcluster`.
-
-An `IngressListener` only applies to envoys which register with a node name matching the `nodename` field.
-
 ### EgressListener
-```yaml
+
+```
 apiVersion: egresslistener.envoy.uw.systems/v1alpha1
 kind: EgressListener
 metadata:
-  name: example-egress-listener
+  name: <listener-name>
 spec:
-  nodename: test-app
-  listenport: 9090
-  targetport: 8080
-  targetcluster: test-cluster
-  lbpolicy: tcp
+  nodename: <envoy-node-name>
+  listenport: 8080 # Port to listen on localhost for egress traffic.
+  target:
+    cluster: <cluster> # The target cluster to forward traffic to
+    port: 8080 # Target cluster port to send traffic
+  lbpolicy: "tcp" # load balancing policy (tcp|http), default is tcp
+  tls:
+    secret: <secret-name> # kubernetes.io/tls secret that contains `tls.crt` and `tls.key` for the tls context
 ```
-An `EgressListener`creates a local listener on `127.0.0.1` that routes traffic to the cluster defined by `targetcluster` on
-`targetport`.
-
-An `EgressListener` only applies to envoys which register with a node name matching the `nodename` field.
 
 ## Next steps
-* Create a full example running cross-cluster in kube
-* mTLS
-  * Define a TLS context for ingress listeners and egress clusters
-  * Source certificates dynamically from a 'Secret Discovery Service' (cert-manager?)
 * Healthchecks
   * Define healthchecks for clusters
 * Improvements

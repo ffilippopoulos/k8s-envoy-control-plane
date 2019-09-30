@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-envoy-control-plane
+  namespace: sys-envoy-cp
+data:
+  config.json: |+
+    [
+      {
+        "name": "aws",
+        "kubeconfig": "/etc/aws/aws.kubeconfig",
+        "listenersource": true
+      },
+      {
+        "name": "gcp",
+        "kubeconfig": "/etc/gcp/gcp.kubeconfig",
+        "listenersource": false
+      }
+    ]

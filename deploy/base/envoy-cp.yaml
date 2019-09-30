@@ -1,0 +1,43 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: k8s-envoy-control-plane
+  namespace: sys-envoy-cp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: k8s-envoy-control-plane
+  name: k8s-envoy-control-plane
+  namespace: sys-envoy-cp
+spec:
+  ports:
+  - name: grpc-server
+    port: 18000
+    protocol: TCP
+    targetPort: 18000
+  selector:
+    app: k8s-envoy-control-plane
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: k8s-envoy-control-plane
+  name: k8s-envoy-control-plane
+  namespace: sys-envoy-cp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: k8s-envoy-control-plane
+  template:
+    metadata:
+      labels:
+        app: k8s-envoy-control-plane
+    spec:
+      containers:
+      - image: quay.io/ffilippopoulos/k8s-envoy-control-plane:cf1be5a
+        name: control-plane

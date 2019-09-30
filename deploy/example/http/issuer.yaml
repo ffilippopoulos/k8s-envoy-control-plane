@@ -1,0 +1,15 @@
+# https://docs.cert-manager.io/en/latest/tasks/issuers/setup-ca.html
+
+# openssl genrsa -out ca.key 2048
+# openssl req -x509 -new -nodes -key ca.key -subj "/CN=cluster.aws.io" -days 3650 -reqexts v3_req -extensions v3_ca -out ca.crt
+# kubectl --context=exp-1-aws --namespace=sys-foo create secret tls ca-key-pair \
+#    --cert=ca.crt \
+#    --key=ca.key
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Issuer
+metadata:
+  name: ca-issuer
+  namespace: sys-foo
+spec:
+  ca:
+    secretName: ca-key-pair

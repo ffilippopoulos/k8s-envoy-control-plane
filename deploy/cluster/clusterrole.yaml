@@ -1,0 +1,27 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8s-envoy-control-plane
+rules:
+- apiGroups: [""]
+  resources: ["pods","secrets"]
+  verbs: ["get","watch","list"]
+- apiGroups: ["ingresslistener.envoy.uw.systems"]
+  resources: ["ingresslisteners"]
+  verbs: ["get","watch","list"]
+- apiGroups: ["egresslistener.envoy.uw.systems"]
+  resources: ["egresslisteners"]
+  verbs: ["get","watch","list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8s-envoy-control-plane
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k8s-envoy-control-plane
+subjects:
+- kind: ServiceAccount
+  name: k8s-envoy-control-plane
+  namespace: sys-envoy-cp

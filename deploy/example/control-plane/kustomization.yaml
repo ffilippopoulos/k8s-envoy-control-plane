@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+  - ../../base/
+  - ../../cluster/
+resources:
+  # need to define a configMap with the config for the control plane
+  - config.yaml
+  # Secrets for the kubeconfig of each cluster are neeeded
+  # e.g.
+  - test-envoy-aws.yaml
+  - test-envoy-gcp.yaml
+patchesStrategicMerge:
+# generic patch to specify environment/namespaces
+  - envoy-cp-patch.yaml
+
+
