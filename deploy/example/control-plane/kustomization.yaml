@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+  - ../../base/
+  - ../../cluster/
+resources:
+  # Secrets for the kubeconfig of each cluster are neeeded
+  # e.t.c.
+  - test-envoy-aws
+  - test-envoy-gcp
+patchesStrategicMerge:
+# generic patch to specify environment/namespaces
+  - envoy-cp-patch.yaml
+
+

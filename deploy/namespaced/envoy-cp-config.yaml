@@ -1,0 +1,47 @@
+# This will be the same for all envoy sidecars
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: envoy-cp-server-config
+data:
+  envoy.yaml: |+
+    admin:
+      access_log_path: /tmp/admin_access.log
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9901
+    
+    dynamic_resources:
+      lds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: xds_cluster
+      cds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: xds_cluster
+    static_resources:
+      clusters:
+      - name: xds_cluster
+        connect_timeout: 1s
+        type: STRICT_DNS
+        lb_policy: ROUND_ROBIN
+        http2_protocol_options: {}
+        upstream_connection_options:
+          # configure a TCP keep-alive to detect and reconnect to the admin
+          # server in the event of a TCP socket half open connection
+          tcp_keepalive: {}
+        load_assignment:
+          cluster_name: xds_cluster
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: k8s-envoy-control-plane.<envoy-ns>.svc.cluster.local
+                    port_value: 18000

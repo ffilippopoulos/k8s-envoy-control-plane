@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-envoy-control-plane
+  namespace: sys-envoy-cp
+data:
+  config.json: |+
+    [
+      {
+        "name": "aws",
+        "kubeconfig": "/etc/aws/aws.kubeconfig",
+        "listenersource": true
+      },
+      {
+        "name": "gcp",
+        "kubeconfig": "/etc/gcp/gcp.kubeconfig",
+        "listenersource": false
+      }
+    ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-envoy-control-plane
+spec:
+  template:
+    spec:
+      containers:
+      - name: control-plane
+        args:
+        - -sources=/etc/config/config.json
+        - -log-level=debug
+        volumeMounts:
+        - name: aws
+          mountPath: "/etc/aws"
+        - name: gcp
+          mountPath: "/etc/gcp"
+        - name: config
+          mountPath: "/etc/config"
+      volumes:
+      - name: aws
+        secret:
+          secretName: test-envoy-aws
+      - name: gcp
+        secret:
+          secretName: test-envoy-gcp
+      - name: config
+        configMap:
+          name: k8s-envoy-control-plane
