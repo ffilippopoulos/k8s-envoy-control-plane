@@ -40,7 +40,7 @@ spec:
   targetport: 80
   rbac:
     cluster: bar-peers
-    Sans:
+    sans:
     - CN=cluster.aws.io/bob,O=cert-manager
     - CN=cluster.aws.io/alice,O=cert-manager
   tls:
