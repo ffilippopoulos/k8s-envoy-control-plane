@@ -1,0 +1,82 @@
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: grpc-server
+  namespace: sys-foo
+spec:
+  secretName: grpc-server-tls
+  issuerRef:
+    name: ca-issuer
+    kind: Issuer
+  dnsNames:
+  - cluster.aws.io/grpc-server
+---
+apiVersion: ingresslistener.envoy.uw.systems/v1alpha1
+kind: IngressListener
+metadata:
+  name: grpc-server
+  namespace: sys-foo
+spec:
+  nodename: grpc-server
+  listenport: 8091
+  targetport: 8090
+  rbac:
+    #cluster: grpc-client
+    Sans:
+    - CN=cluster.aws.io/grpc-client,O=cert-manager
+  tls:
+    secret: grpc-server-tls
+    validation: grpc-server-tls
+  layer: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grpc-server
+  name: grpc-server
+  namespace: sys-foo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: grpc-server
+  template:
+    metadata:
+      annotations:
+        cluster-name.envoy.uw.io: grpc-server
+      labels:
+        app: grpc-server
+    spec:
+      containers:
+      - image: quay.io/jakekeeys/grpc-lb-test:latest
+        name: grpc-server     
+        args:
+        - server
+        env:
+        - name: HTTP_BIND
+          value: 127.0.0.1:8080
+        - name: GRPC_BIND
+          value: 127.0.0.1:8090
+        resources:
+          limits:
+            memory: 50Mi
+          requests:
+            memory: 25Mi
+      - image: envoyproxy/envoy-alpine:v1.10.0
+        name: envoy
+        args:
+        - -c /etc/envoy/envoy.yaml
+        - -l debug
+        - --service-node grpc-server
+        - --service-cluster grpc-server
+        ports:
+        - name: grpc-listener
+          containerPort: 8099
+        volumeMounts:
+        - name: envoy
+          mountPath: "/etc/envoy"
+      volumes:
+      - name: envoy
+        configMap:
+          name: envoy-cp-server-config

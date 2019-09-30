@@ -1,0 +1,67 @@
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: bob
+  namespace: sys-foo
+spec:
+  secretName: bob-tls
+  issuerRef:
+    name: ca-issuer
+    kind: Issuer
+  commonName: cluster.aws.io/bob
+---
+apiVersion: egresslistener.envoy.uw.systems/v1alpha1
+kind: EgressListener
+metadata:
+  name: bob
+spec:
+  nodename: bob
+  listenport: 8080
+  target:
+    cluster: bar
+    port: 8080
+  lbpolicy: "tcp"
+  tls:
+    secret: bob-tls
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: bob
+  name: bob
+  namespace: sys-foo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bob
+  template:
+    metadata:
+      labels:
+        app: bob
+      annotations:
+        cluster-name.envoy.uw.io: bar-peers
+    spec:
+      containers:
+      - image: alpine
+        name: bob
+        command:
+        - /bin/sh
+        - -c
+        - |
+          while true; do wget -O - 127.0.0.1:8080; sleep 1; done
+      - image: envoyproxy/envoy-alpine:v1.10.0
+        name: envoy
+        args:
+        - -c /etc/envoy/envoy.yaml
+        - -l debug
+        - --service-node bob
+        - --service-cluster bob
+        volumeMounts:
+        - name: envoy
+          mountPath: "/etc/envoy"
+      volumes:
+      - name: envoy
+        configMap:
+          name: envoy-cp-server-config

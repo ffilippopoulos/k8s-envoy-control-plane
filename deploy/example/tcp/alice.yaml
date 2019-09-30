@@ -1,0 +1,68 @@
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: alice
+  namespace: sys-foo
+spec:
+  secretName: alice-tls
+  issuerRef:
+    name: ca-issuer
+    kind: Issuer
+  dnsNames:
+  - cluster.aws.io/alice
+---
+apiVersion: egresslistener.envoy.uw.systems/v1alpha1
+kind: EgressListener
+metadata:
+  name: alice
+spec:
+  nodename: alice
+  listenport: 8080
+  target:
+    cluster: bar
+    port: 8080
+  lbpolicy: "tcp"
+  tls:
+    secret: alice-tls
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: alice
+  name: alice
+  namespace: sys-foo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alice
+  template:
+    metadata:
+      labels:
+        app: alice
+      annotations:
+        cluster-name.envoy.uw.io: bar-peers
+    spec:
+      containers:
+      - image: alpine
+        name: alice
+        command:
+        - /bin/sh
+        - -c
+        - |
+          while true; do wget -O - 127.0.0.1:8080; sleep 1; done
+      - image: envoyproxy/envoy-alpine:v1.10.0
+        name: envoy
+        args:
+        - -c /etc/envoy/envoy.yaml
+        - -l debug
+        - --service-node alice
+        - --service-cluster alice
+        volumeMounts:
+        - name: envoy
+          mountPath: "/etc/envoy"
+      volumes:
+      - name: envoy
+        configMap:
+          name: envoy-cp-server-config

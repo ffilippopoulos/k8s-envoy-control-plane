@@ -1,9 +1,0 @@
-apiVersion: ingresslistener.envoy.uw.systems/v1alpha1
-kind: IngressListener
-metadata:
-  name: example-listener
-spec:
-  nodename: test-app
-  listenport: 8080
-  targetport: 8081
-  rbacallowcluster: test-cluster

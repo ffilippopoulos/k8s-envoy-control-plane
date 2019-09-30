@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: bar
+  name: bar
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: bar
+  type: ClusterIP
+  clusterIP: None
+---
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: bar
+  namespace: sys-foo
+spec:
+  secretName: bar-tls
+  issuerRef:
+    name: ca-issuer
+    kind: Issuer
+  commonName: bar.cluster.aws.io
+  dnsNames:
+  - bar.cluster.aws.io
+---
+apiVersion: ingresslistener.envoy.uw.systems/v1alpha1
+kind: IngressListener
+metadata:
+  name: bar
+  namespace: sys-foo
+spec:
+  nodename: bar
+  listenport: 8080
+  targetport: 80
+  rbac:
+    cluster: bar-peers
+    Sans:
+    - CN=cluster.aws.io/bob,O=cert-manager
+    - CN=cluster.aws.io/alice,O=cert-manager
+  tls:
+    secret: bar-tls
+    validation: bar-tls
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: bar
+  name: bar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bar
+  template:
+    metadata:
+      labels:
+        app: bar
+      annotations:
+        cluster-name.envoy.uw.io: bar
+    spec:
+      initContainers:
+      - image: alpine
+        imagePullPolicy: Always
+        name: bar-config
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cat <<EOF >> /etc/nginx/nginx.conf
+          events {
+          }
+          http {
+            server {
+              listen 127.0.0.1:80;
+            }
+          }
+          EOF
+          mkdir /etc/nginx/html && cat << EOF >> /etc/nginx/html/index.html
+          bar!!!
+        volumeMounts:
+        - name: config
+          mountPath: "/etc/nginx"
+      containers:
+      - image: nginx
+        imagePullPolicy: Always
+        name: nginx
+        volumeMounts:
+        - name: config
+          mountPath: "/etc/nginx"
+      - image: envoyproxy/envoy-alpine:v1.10.0
+        name: envoy
+        args:
+        - -c /etc/envoy/envoy.yaml
+        - -l debug
+        - --service-node bar
+        - --service-cluster bar
+        ports:
+        - name: http-listener
+          containerPort: 8080
+        volumeMounts:
+        - name: envoy
+          mountPath: "/etc/envoy"
+      volumes:
+      - name: config
+        emptyDir: {}
+      - name: envoy
+        configMap:
+          name: envoy-cp-server-config
+---
