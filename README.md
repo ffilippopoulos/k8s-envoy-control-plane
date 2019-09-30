@@ -11,9 +11,9 @@ In brief, this is how it works:
 
 ## Deploy
 
-Templates to deploy using `kustomize` are provided here[./deploy].
-Also there are examples to deploy the the control-plane[./deploy/example/control-plane/] as well as examples of usage for tcp[./deploy/example/tcp/] and http[deploy/example/http/] configurations.
-It is handy for every namespace to include a configMap[./deploy/example/tcp/envoy-cp-config.yaml] that points envoy instances to the control plane, as this is shared by all the instances.
+Templates to deploy using `kustomize` are provided [here](./deploy).
+Also there are examples to deploy the the [control-plane](./deploy/example/control-plane/) as well as examples of usage for [tcp](./deploy/example/tcp/) and [http](deploy/example/http/) configurations.
+It is handy for every namespace to include a [configMap](./deploy/example/tcp/envoy-cp-config.yaml) that points envoy instances to the control plane, as this is shared by all the instances.
 
 Along with fetching the upstream manifests, secrets that include kubeconfigs for the controlled kubernetes clusters need to be created.
 An example script to generate one:
