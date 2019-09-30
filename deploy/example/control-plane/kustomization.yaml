@@ -4,10 +4,10 @@ bases:
   - ../../base/
   - ../../cluster/
 resources:
-  # need to define a configMap with the confi for the control plane
+  # need to define a configMap with the config for the control plane
   - config.yaml
   # Secrets for the kubeconfig of each cluster are neeeded
-  # e.t.c.
+  # e.g.
   - test-envoy-aws.yaml
   - test-envoy-gcp.yaml
 patchesStrategicMerge:

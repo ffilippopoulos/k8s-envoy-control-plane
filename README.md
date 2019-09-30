@@ -78,7 +78,7 @@ data:
 
 ### Sources configuration - control plane
 
-Each source is a kubernets cluster that the control plane is going to watch events from. An example config will be:
+Each source is a kubernetes cluster that the control plane is going to watch events from. An example config will be:
 
 ```
     [
@@ -117,7 +117,7 @@ spec:
   targetport: 80 # Port to forward on localhost
   rbac:
     cluster: <cluster> # Only accept incoming traffic from cluster
-    Sans: # List of SANs to accept traffic from in case of tls
+    sans: # List of SANs to accept traffic from in case of tls
     - cluster.aws.io/bob
     - cluster.aws.io/alice
   tls:
@@ -137,7 +137,7 @@ spec:
   target:
     cluster: <cluster> # The target cluster to forward traffic to
     port: 8080 # Target cluster port to send traffic
-  lbpolicy: "tcp" # loab balancing policy (tcp|http), default is tcp
+  lbpolicy: "tcp" # load balancing policy (tcp|http), default is tcp
   tls:
     secret: <secret-name> # kubernetes.io/tls secret that contains `tls.crt` and `tls.key` for the tls context
 ```
